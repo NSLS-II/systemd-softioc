@@ -1,0 +1,216 @@
+# base directory for IOC instance
+SOFTBASE=/epics/iocs
+#SOFTBASE=/epics/iocs:/opt/iocs
+
+warn () {
+    echo "$1" >&2
+}
+
+
+die () {
+    echo "$1" >&2
+    exit 1
+}
+
+
+usage() {
+    printf "Usage: %s [-v] [-x] cmd\n" `basename $0`
+    echo "Available commands:"
+    echo "  help          - display this message"
+    echo "  report [ioc]  - Show config of all/an IOC"
+    echo "  status        - Check if IOCs are running"
+    echo "  nextport      - Find the next unused procServ port"
+    echo "  install <ioc> - Create /etc/init.d/softioc-[ioc]"
+    echo "  enable <ioc>  - Register IOC to start during system boot"
+    echo "  disable <ioc> - Un-register IOC"
+    echo "  startall      - Start all IOCs installed for this system"
+    echo "  stopall       - Stop all IOCs installed for this system"
+    exit 2
+}
+
+
+requireroot() {
+    [ "`id -u`" -eq 0 ] || die "Aborted: this action requires root access"
+}
+
+
+# Must run this before calling any of the below; Sets: $IOCPATH
+iocinit() {
+    IOCPATH=/etc/iocs
+    if [ -n "$SOFTBASE" ]
+    then
+        # Search in system locations first then user locations
+        IOCPATH="$IOCPATH:$SOFTBASE"
+    fi
+}
+
+
+# $1 /base/dir/and/iocname
+loadconfig() {
+    IOC="`basename $1`"
+    BASE="`dirname $1`"
+    if [ ! -r "$1/config" ]; then
+        echo "Missing config $1/config" >&2
+        return 1
+    fi
+    unset EXEC USER HOST
+    PORT=0
+    local INSTBASE="$1"
+    . "$1/config"
+}
+
+
+# Run command $1 on IOC all instances
+# $1 - A shell command
+# $2 - IOC name (empty for all IOCs)
+visit() {
+    [ -z "$1" ] && die "visitall: missing argument"
+    vcmd="$1"
+    vname="$2"
+    shift
+    shift
+
+    save_IFS="$IFS"
+    IFS=':'
+    for ent in $IOCPATH
+    do
+        IFS="$save_IFS"
+        [ -z "$ent" -o ! -d "$ent" ] && continue
+
+        for iocconf in "$ent"/*/config
+        do
+            ioc="`dirname "$iocconf"`"
+            name="`basename "$ioc"`"
+            [ "$name" = '*' ] && continue
+
+            if [ -z "$vname" ] || [ "$name" = "$vname" ]; then
+                $vcmd $ioc "$@"
+            fi
+        done
+    done
+}
+
+
+# Find the location of an IOC
+# prints a single line which is a directory, which contains '$IOC/config'
+# $1 - IOC name
+findbase() {
+    [ -z "$1" ] && die "visitall: missing argument"
+    IOC="$1"
+
+    save_IFS="$IFS"
+    IFS=':'
+    for ent in $IOCPATH
+    do
+        IFS="$save_IFS"
+        [ -z "$ent" -o ! -d "$ent" ] && continue
+
+        if [ -f "$ent/$IOC/config" ]; then
+            printf "$ent"
+            return 0
+        fi
+    done
+    return 1
+}
+
+
+# Print IOC instance config: BASEDIR  IOCNAME  USER  PORT  HOSTNAME  CMD
+# $1 - iocdir
+reportone() {
+    if [ -z "$HEADER" ]; then
+        case "$2" in
+        conserver) # no header
+            ;;
+        *)
+            printf "%-15s | %-15s | %-15s | %5s | %s\n" BASE IOC USER PORT EXEC
+            ;;
+        esac
+        export HEADER=1
+    fi
+    local IOC="`basename $1`"
+    local BASE="`dirname $1`"
+    if [ ! -r "$1/config" ]; then
+        echo "Missing config $1/config" >&2
+        return 1
+    fi
+    unset EXEC USER HOST
+    PORT=0
+    local INSTBASE="$1"
+    CHDIR="$1"
+    . "$1/config"
+    USER="${USER:-${IOC}}"
+    EXEC="${EXEC:-${INSTBASE}/st.cmd}"
+    case "$2" in
+    conserver)
+        # skip IOC which don't specify a host
+        [ -n "$HOST" -a -n "$PORT" ] || continue
+        # identify if this is the host system
+        [ "$HOST" = "$(hostname -s)" -o "$HOST" = "$(hostname -f)" ] \
+            && HOST=localhost || continue
+        echo "console $IOC {include softioc; master $HOST; port $PORT;}"
+        ;;
+    all)
+        [ -n "$HOST" ] || HOST="<anywhere>"
+        printf "%-15s | %-15s | %-15s | %-15s | %5s | %s\n" $BASE $HOST $IOC \
+            $USER $PORT $EXEC
+        ;;
+    *)
+        [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" \
+            -a -n "$HOST" ] && return 0
+        [ -n "$HOST" ] || HOST="<anywhere>"
+        printf "%-15s | %-15s | %-15s | %5s | %s\n" $BASE $IOC $USER $PORT $EXEC
+        ;;
+    esac
+}
+
+
+installioc() {
+    IOC="$1"
+    BASE="`findbase "$IOC"`"
+    [ $? -ne 0 ] && die "Failed to find ioc $IOC"
+    echo "Installing IOC $BASE/$IOC"
+    #SCRIPT="$INITDDIR/softioc-$IOC"
+    SCRIPT="/etc/init.d/softioc-$IOC"
+    echo "As $SCRIPT"
+    if [ -h "$SCRIPT" ]
+    then
+        # old-style symlink
+        echo "Replacing existing symlink to `readlink "$SCRIPT"`"
+        rm -f "$SCRIPT" || die "Failed to remove symlink"
+    elif [ -f "$SCRIPT" ] && ! grep 'AUTOMATICALLYGENERATED' "$SCRIPT" &>/dev/null
+    then
+        # script is a file and isn't automatically managed
+        mv --backup=numbered "$SCRIPT" "$SCRIPT".old || die "failed to backup"
+        echo "Backing up existing script"
+    fi
+    cat << EOF > "$SCRIPT"
+#!/bin/sh
+## Notice
+# This file was generated by `basename $0`
+# on `date -R`
+# If you edit this file then remove the following line
+# to prevent automatic updates
+## AUTOMATICALLYGENERATED
+
+### BEGIN INIT INFO
+# Provides:          softioc-$IOC
+# Required-Start:    \$remote_fs \$local_fs \$network \$syslog \$time
+# Required-Stop:     \$remote_fs \$local_fs \$network \$syslog
+# Should-Start:      \$named slapd autofs ypbind nscd nslcd
+# Should-Stop:       \$named slapd autofs ypbind nscd nslcd
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: An EPICS Soft IOC
+# Description:       Control a single software IOC
+### END INIT INFO
+
+#. "$INITBASESCRIPT"
+. "/usr/local/sysv-rc-softioc/softioc"
+EOF
+    [ -f "$SCRIPT" -a -s "$SCRIPT" ] || die "Failed to create $SCRIPT"
+    chmod +x "$SCRIPT"
+    echo "Complete"
+    echo "To add the IOC to the system boot order run:"
+    echo " `basename $0` enable $IOC"
+}
+

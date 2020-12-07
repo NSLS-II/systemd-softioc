@@ -1,0 +1,29 @@
+[Unit]
+Description=IOC 'example' via procServ 
+After=network.target remote_fs.target local_fs.target syslog.target time.target
+#SourcePath=/opt/epicsarchiverap/archappl.bash
+ConditionFileIsExecutable=/usr/bin/procServ
+ConditionFileIsExecutable=/epics/iocs/example/st.cmd
+#ConditionDirectoryNotEmpty=/usr/local/ops
+#RequiresMountsFor=/usr/local/epics /usr/local/ops
+
+[Service]
+User=softioc
+Group=softioc
+ExecStart=/usr/bin/procServ -f -q -c /epics/iocs/example -i ^D^C^] -n example  --restrict -L /var/log/softioc/example/softioc-example.log -p /var/run/softioc-example.pid 5040 /epics/iocs/example/st.cmd
+Restart=on-failure
+#ExecStop=/bin/kill -9 "$(cat /var/run/softioc-example.pid)"
+#KillMode=process
+
+#EnvironmentFile=-/etc/sysconfig/rsyslog
+#ExecStart=/home/yhu/example/st.cmd
+#ExecStop=/bin/bash -c "/opt/epicsarchiverap/archappl.bash shutdown"
+#Type=simple
+#Type=forking
+#LogLevelMax=2
+#UMask=0066
+#StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target
+;Alias=softioc-example.service

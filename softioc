@@ -1,0 +1,236 @@
+
+#!/bin/bash
+# Debian init script for EPICS soft iocs
+#
+# The IOC name is determined from the script name.
+#
+# i.e.  ln -s softioc /etc/init.d/softioc-MYIOCNAME
+#
+# Expects /etc/default/epics-softioc to exist and contain (at minimum)
+# a line like:
+#
+#   SOFTBASE=/epics/iocs
+# or
+#   SOFTBASE=/epics/iocs:/home/epics/iocs
+#
+# First /etc and then these directories are search for $prefix/MYIOCNAME/config
+#
+# It sources all files matching $prefix/config/global until it finds
+# $prefix/MYIOCNAME/config at which point it sources this file and then
+# starts procServ.
+#
+# When started procServ is used to cd to $prefix/MYIOCNAME and runs ./st.cmd
+#
+# The environment of the IOC is determined by the config scripts
+#
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+LOGNAME="$(basename "$(readlink -f "$0")")"
+
+. /lib/lsb/init-functions
+
+warn () {
+	logger -p daemon.warning -t "$LOGNAME" "Warning: $1" || true
+	log_warning_msg "$1"
+}
+
+die () {
+	logger -p daemon.err -t "$LOGNAME" "Error: $1" || true
+	log_failure_msg "$1"
+	exit 1
+}
+
+LIBRARY=/usr/share/sysv-rc-softioc/library.sh
+
+[ -f "$LIBRARY" ] || die "Missing $LIBRARY"
+. "$LIBRARY"
+
+iocinit
+
+PROCSERV=/usr/bin/procServ
+
+NAME=$(basename $0)
+#IOC=${NAME#softioc-}
+IOC=$(echo "$NAME"|cut -f '2-' -d '-')
+
+#
+# The script is in /etc/init.d/softioc
+#  For ioc NAME:
+#    ln -s softioc /etc/init.d/softioc-NAME
+#
+if [ "$NAME" = "softioc" ]; then
+  echo "$0 is meant to be a symlink with a name like 'softioc-NAME'"
+  echo "where 'NAME' is the name of a softioc instance"
+  echo "example: ln -s softioc /etc/init.d/softioc-myioc"
+  exit 0
+fi
+
+IOCBASE="`findbase "$IOC"`"
+[ $? -ne 0 -o -z "$IOCBASE" ] && die "Failed to find ioc $IOC in $IOCPATH"
+GLOBALBASE="$IOCBASE/config"
+INSTBASE="$IOCBASE/$IOC"
+
+# Modify environment before including global config
+#
+# NAME is the ioc instance name to be used for consistance checking
+NAME=invalid
+# PORT to be used by procServ
+PORT=invalid
+# USER to run procServ (if not set defaults to $IOC)
+unset USER
+# Computer that this softioc runs on.  Used to prevent copy+paste
+# errors and duplicate PV names.  (optional)
+unset HOST
+unset CHDIR
+# By default write logfile.  Set to 0 or '' to disable.
+LOG=1
+
+
+INSTCONF="$INSTBASE/config"
+CHDIR="$INSTBASE"
+
+if [ -f "$GLOBALBASE/config" ]
+then
+	cd "$GLOBALBASE"
+	. "$GLOBALBASE/config"
+fi
+
+cd "$INSTBASE" || die "Failed to cd to $INSTBASE"
+
+. "$INSTCONF"
+
+# provide defaults for things not set by any config
+
+# default user name is softioc instance name
+USER="${USER:-${IOC}}"
+
+EXEC="${EXEC:-${CHDIR}/st.cmd}"
+
+# consistency checking
+
+[ "$NAME" = "invalid" ] && die "Configuration does not set IOC name"
+[ "$NAME" = "$IOC" ] || die "Configuration name ($NAME) does not match IOC instance ($IOC)"
+
+# The port to use for procServ
+[ "$PORT" = "invalid" ] && die "Configuration does not set port"
+
+if [ -n "$HOST" ]; then
+  if [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" ]; then
+    die "This softioc instance runs on '$HOST' not this host '$(hostname -f)'"
+  fi
+fi
+
+# The official runtime environment
+export HOSTNAME="$(hostname -s)"
+export IOCNAME="$NAME"
+export TOP="$INSTBASE"
+export EPICS_HOST_ARCH=`/usr/lib/epics/startup/EpicsHostArch`
+export PROCPORT="$PORT"
+# also USER
+
+PID=/var/run/softioc-$IOC.pid
+LOGDIR=/var/log/softioc/${IOC}
+
+check_status() {
+  if [ "$1" = "-q" ];then
+    status_of_proc -p "$PID" "procServ" "$IOC" 2>&1 >/dev/null
+  else
+    status_of_proc -p "$PID" "procServ" "$IOC"
+  fi
+  return $?
+}
+
+# Verify that user $1 exists on this system
+check_user() {
+  id "$USER" 2>&1 >/dev/null || die "Account User: $USER or group softioc is\
+ missing on this system"
+}
+
+PROCARGS="-q -c $CHDIR -i ^D^C^] -p $PID -n $IOC --restrict"
+
+if [ -n "$LOG" -a "$LOG" != 0 ]; then
+	PROCARGS="$PROCARGS --logfile=$LOGDIR/$IOC.log"
+fi
+
+if [ -n $CORESIZE ]; then
+	PROCARGS="$PROCARGS --coresize=$CORESIZE"
+fi
+
+case "$1" in
+
+start)
+	check_user
+	logger -p daemon.info -t "$LOGNAME" "Starting softioc: $IOC" || true
+	log_daemon_msg "Starting softioc" "$IOC "
+
+	# Needed so that the pid file can be written by $USER
+	# procServ will put in the correct pid
+	touch $PID || die "Failed to create pid file"
+	chown "$USER" $PID || die "Failed to chown pid file"
+	# Ensure PID is readable so 'manage-iocs status' works for anyone
+	# regardless of the active umask when an ioc is restarted.
+	chmod a+r $PID || die "Failed to chmod pid file"
+
+	# create log directory if necessary
+	[ -d "$LOGDIR" ] || install -d -m755 -o "$USER" "$LOGDIR" \
+	|| echo "Warning: Failed to create directory: $LOGDIR"
+
+	start-stop-daemon --start --pidfile $PID \
+	--chdir "$CHDIR" --startas $PROCSERV --name procServ \
+	--chuid "$USER" \
+	-- $PROCARGS $PORT $EXEC
+
+	sleep 2
+
+	if check_status -q; then
+		logger -p daemon.info -t "$LOGNAME" "Running" || true
+		log_end_msg 0
+	else
+		logger -p daemon.err -t "$LOGNAME" "Failed to start" || true
+		log_failure_msg
+		log_end_msg 1
+		exit 1
+	fi
+
+		
+	;;
+stop)
+	logger -p daemon.info -t "$LOGNAME" "Stopping softioc: $IOC" || true
+	log_daemon_msg "Stopping softioc" "$IOC "
+
+	start-stop-daemon --stop --quiet --pidfile $PID \
+	--user "$USER" --name procServ \
+	--retry=TERM/30/KILL/5
+
+	R=$?
+	logger -p daemon.info -t "$LOGNAME" "Stopping softioc: $IOC ($R)" || true
+	log_end_msg $R
+
+	rm -f "$PID"
+	;;
+status)
+	echo -n "Status of softioc $IOC : "
+	check_status
+	exit $?
+	;;
+restart|reload|force-reload)
+	$0 stop
+	[ $? -ne 0 ] && exit 0
+	sleep 2
+	$0 start
+	exit $?
+	;;
+info)
+	echo "IOC: $IOC"
+	echo "USER: $USER"
+	echo "PORT: $PORT"
+	echo "BASE: $CHDIR"
+	echo "EXEC: $EXEC"
+	;;
+*)
+	die "Usage: $0 {start|stop|restart|status|info}"
+	;;
+esac
+
+exit 0

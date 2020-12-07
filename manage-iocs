@@ -1,0 +1,113 @@
+#!/bin/bash
+
+PATH="${PATH}:/usr/sbin"
+
+# functions
+. "/usr/local/sysv-rc-softioc/library.sh"
+
+VERB=
+while getopts hvx arg
+do
+    case $arg in
+    v)    VERB=1;;
+    x)    set -x;;
+    h)    usage;;
+    esac
+done
+shift $(($OPTIND - 1))
+
+iocinit
+
+[ -n "$VERB" ] && echo "Searching in: $IOCPATH"
+
+cmd="$1"
+shift
+
+[ -n "$VERB" ] && echo "Command: $cmd"
+
+case "$cmd" in
+report)
+    visit reportone "$@"
+    ;;
+
+list)
+    visit echo "$1"
+    ;;
+
+status)
+    ls -1 /etc/init.d/softioc-*[^~] | while read ff
+    do
+        printf "$ff\t\t"
+        IOC="`basename "$ff"`"
+        if $ff status &>/dev/null
+        then
+            printf "Running"
+        else
+            printf "Stopped"
+        fi
+        if ! ls /etc/rc*.d/*$IOC &>/dev/null
+        then
+            printf ".  Not registered"
+        fi
+        printf "\n"
+    done
+    ;;
+
+nextport)
+    # Find the highest port in use and add one.
+    LAST="`visit reportone "$1" | tail -n '+2' | awk '{print $7}' | sort -n | tail -n1`"
+    if [ -n "$LAST" ] && [ "$LAST" -ne 0 ]
+    then
+        # print next port
+        expr "$LAST" '+' 1
+    else
+        echo 4050
+    fi
+    ;;
+
+install)
+    requireroot
+    installioc "$1"
+    ;;
+
+enable)
+    requireroot
+    [ -z "$1" ] && die "Missing argument"
+    echo "Enable: softioc-$1"
+    #update-rc.d "softioc-$1" defaults 99
+    chkconfig --level 2345 "softioc-$1" on
+    ;;
+
+disable)
+    requireroot
+    [ -z "$1" ] && die "Missing argument"
+    echo "Disable: softioc-$1"
+    #update-rc.d -f "softioc-$1" remove
+    chkconfig --del "softioc-$1"
+    ;;
+
+stopall)
+    requireroot
+    for initfile in /etc/init.d/softioc-*[^~]
+    do
+        $initfile stop 
+    done
+    ;;
+
+startall)
+    requireroot
+    for initfile in /etc/init.d/softioc-*[^~]
+    do
+        $initfile start 
+    done
+    ;;
+
+help)
+    usage
+    ;;
+*)
+    [ "$cmd" ] && warn "Unknown command '$cmd'"
+    usage
+    exit 1
+    ;;
+esac
