@@ -1,0 +1,52 @@
+# softIoc name and port must be unique on the
+# server where it runs.  It is required that
+# the name be unique.
+#
+# The port is the one used by procServ for its
+# telnet server.
+#
+NAME=myioc
+PORT=4050
+
+# User name to run the IOC
+# create and use a generic username "softioc"
+# or use any existing username
+# or manually create a username for each softioc instance
+#
+# Defaults to $NAME
+#
+#USER=softioc
+
+# Name of the server on which this softIoc
+# will run.  This is used for error checking
+# to prevent the instance from being run on
+# the wrong server.
+#
+# If not set then the check is disabled
+#
+#HOST=myserver.domain.com
+
+# IOC executable name.  This is the command
+# given to procServ to start the IOC.
+#
+# Defaults to st.cmd in the IOC's top directory (i.e. /epics/iocs/myioc)
+#
+#EXEC="$CHDIR/st.cmd"
+
+# IOC run directory.  The directory in which
+# procServ will start the IOC.  It is permissable
+# to modify or replace the value.
+# eg. CHDIR="$CHDIR/iocBoot/iocexample"
+#
+# Defaults to '/youriocbasedir/$NAME'
+#   (the directory containing this file)
+#
+#CHDIR="$CHDIR"
+
+# Write a core file if process crashes and the size
+# of the corefile is not more than the value given
+# in bytes.
+#
+# By default no core files are generated.
+#
+#CORESIZE=10000000
