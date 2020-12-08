@@ -1,11 +1,6 @@
-This repository is derived from:
+This repository is derived from: https://github.com/epicsdeb/sysv-rc-softioc
 
-"SYSV style init script for procServ with the intent of running an EPICS IOC"
-
-https://github.com/epicsdeb/sysv-rc-softioc
-
-
-Contains a systemd style initialization script for a softioc using procServ.
+This repository contains a systemd style initialization script for a softioc using procServ.
 
 = Usage =
 
@@ -14,13 +9,17 @@ Use "install.sh" (with sudo access) to install this package. By default, the sou
 Source files:
 
 epics-softioc.conf: this is where you can customize a few things; 
+
 manage-iocs: the main script; 
+
 library.sh: functions used in the script manage-iocs;
 
-The following are provided as information.
+The following are provided as information:
 
 config.example: a template showing how to create a file named 'config' for an IOC instance/application; 
+
 softioc-example.service: the unit file for the IOC named "example"
+
 README.md (this file)
 
 == manage-iocs ==
@@ -52,8 +51,11 @@ This will be a single directory which will contain a subdirectory for each softI
 Set this path in 'epics-softioc.conf'.
 
 $ cat epics-softioc.conf
+
 # base directory for IOC instances
+
 IOCPATH=/epics/iocs
+
 #IOCPATH=/epics/iocs:/opt/epics/iocs
 
 2) Create a Unix group softIocs
@@ -61,14 +63,19 @@ IOCPATH=/epics/iocs
 Altough each softIoc can run as a separate user/group, it is recommended using a single username 'softioc' (or all softIoc users be in the same group).  This provides a nice division and allows Channel Access security to distinguish all the instances on a given machine.
 
 # useradd softioc
+
 (# groupadd softioc)
 
 3) Create the directory for softIoc instances
 
 # mkdir /epics
+
 # chgrp softioc /epics
+
 # chmod g+s /epics
+
 # mkdir /epics/iocs
+
 # chmod g+ws /epics/iocs
 
 4) (optional) Install Conserver
@@ -80,6 +87,7 @@ Conserver is a process which connects to the telnet servers provided by all the 
 Edit /etc/conserver/conserver.cf to include the following line.
 
 default softioc { type host; host localhost;}
+
 #include /etc/conserver/iocs.cf
 
 See the conserver documentation for information on access control.
@@ -95,6 +103,7 @@ Try to pick something more creative than example1 ;)
 2) Create an IOC instance directory
 
 # mkdir /epics/iocs/example1
+
 (option: Create a user: # useradd -c 'softioc' -d /epics/iocs/example1 -g softioc -N example1
 
 3) Create and configure the instance's config file
