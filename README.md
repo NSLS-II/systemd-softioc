@@ -8,19 +8,19 @@ Use "install.sh" (with sudo access) to install this package. By default, the sou
 
 Source files:
 
-epics-softioc.conf: this is where you can customize a few things; 
+    epics-softioc.conf: this is where you can customize a few things; 
 
-manage-iocs: the main script; 
+    manage-iocs: the main script; 
 
-library.sh: functions used in the script manage-iocs;
+    library.sh: functions used in the script manage-iocs;
 
 The following are provided as information:
 
-config.example: a template showing how to create a file named 'config' for an IOC instance/application; 
+    config.example: a template showing how to create a file named 'config' for an IOC instance/application; 
 
-softioc-example.service: the unit file for the IOC named "example"
+    softioc-example.service: the unit file for the IOC named "example"
 
-README.md (this file)
+    README.md (this file)
 
 == manage-iocs ==
 
@@ -29,17 +29,29 @@ to help in managing softiocs.  See its manpage for
 details.
 
 $ manage-iocs help
+
 Usage: manage-iocs [-v] [-x] cmd
+
 Available commands:
+
   help            - display this message
+
   report [ioc]    - Show config of all/an IOC
+
   status          - Check if IOCs are running
+
   nextport        - Find the next unused procServ port
+
   install <ioc>   - Create /etc/systemd/system/softioc-[ioc].service
+
   uninstall <ioc> - Remove /etc/systemd/system/softioc-[ioc].service
+
   start <ioc>     - Start the IOC <ioc>
+
   stop <ioc>      - Stop the IOC <ioc>
+
   startall        - Start all IOCs installed for this system
+
   stopall         - Stop all IOCs installed for this system
 
 == Initial Setup ==
@@ -52,7 +64,7 @@ Set this path in 'epics-softioc.conf'.
 
 $ cat epics-softioc.conf
 
-# base directory for IOC instances
+#base directory for IOC instances
 
 IOCPATH=/epics/iocs
 
@@ -62,27 +74,27 @@ IOCPATH=/epics/iocs
 
 Altough each softIoc can run as a separate user/group, it is recommended using a single username 'softioc' (or all softIoc users be in the same group).  This provides a nice division and allows Channel Access security to distinguish all the instances on a given machine.
 
-# useradd softioc
+#useradd softioc
 
-(# groupadd softioc)
+(#groupadd softioc)
 
 3) Create the directory for softIoc instances
 
-# mkdir /epics
+#mkdir /epics
 
-# chgrp softioc /epics
+#chgrp softioc /epics
 
-# chmod g+s /epics
+#chmod g+s /epics
 
-# mkdir /epics/iocs
+#mkdir /epics/iocs
 
-# chmod g+ws /epics/iocs
+#chmod g+ws /epics/iocs
 
 4) (optional) Install Conserver
 
 Conserver is a process which connects to the telnet servers provided by all the softIocs on a host.  It then allows (secure) remote access and continuous logging.
 
-# apt-get install conserver-server
+#apt-get install conserver-server
 
 Edit /etc/conserver/conserver.cf to include the following line.
 
@@ -102,9 +114,9 @@ Try to pick something more creative than example1 ;)
 
 2) Create an IOC instance directory
 
-# mkdir /epics/iocs/example1
+#mkdir /epics/iocs/example1
 
-(option: Create a user: # useradd -c 'softioc' -d /epics/iocs/example1 -g softioc -N example1
+(option: Create a user: #useradd -c 'softioc' -d /epics/iocs/example1 -g softioc -N example1
 
 3) Create and configure the instance's config file
 
@@ -128,13 +140,13 @@ See config.example for allowed items in a IOC config file.
 
 4) Create/replace the systemd unit file (/etc/systemd/system/softioc-example.service). The IOC will automatically startup after the host server boots up.
 
-# manage-iocs install example1
+#manage-iocs install example1
 
 (# manage-iocs uninstall example1: this removes the unit file /etc/systemd/system/softioc-example.service)
 
 5) Manually starting the instance
 
-# manage-iocs start example1
+#manage-iocs start example1
 
 6) Telnet to the IOC example1's EPICS shell
 
