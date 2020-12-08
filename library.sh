@@ -1,62 +1,24 @@
-# base directory for IOC instance
-SOFTBASE=/epics/iocs
-#SOFTBASE=/epics/iocs:/opt/iocs
-
-warn () {
-    echo "$1" >&2
-}
-
-
-die () {
-    echo "$1" >&2
-    exit 1
-}
-
+# functions used in manage-iocs
 
 usage() {
     printf "Usage: %s [-v] [-x] cmd\n" `basename $0`
     echo "Available commands:"
-    echo "  help          - display this message"
-    echo "  report [ioc]  - Show config of all/an IOC"
-    echo "  status        - Check if IOCs are running"
-    echo "  nextport      - Find the next unused procServ port"
-    echo "  install <ioc> - Create /etc/init.d/softioc-[ioc]"
-    echo "  enable <ioc>  - Register IOC to start during system boot"
-    echo "  disable <ioc> - Un-register IOC"
-    echo "  startall      - Start all IOCs installed for this system"
-    echo "  stopall       - Stop all IOCs installed for this system"
+    echo "  help            - display this message"
+    echo "  report [ioc]    - Show config of all/an IOC"
+    echo "  status          - Check if IOCs are running"
+    echo "  nextport        - Find the next unused procServ port"
+    echo "  install <ioc>   - Create /etc/systemd/system/softioc-[ioc].service"
+    echo "  uninstall <ioc> - Remove /etc/systemd/system/softioc-[ioc].service"
+    echo "  start <ioc>     - Start the IOC <ioc>"
+    echo "  stop <ioc>      - Stop the IOC <ioc>"
+    echo "  startall        - Start all IOCs installed for this system"
+    echo "  stopall         - Stop all IOCs installed for this system"
     exit 2
 }
 
 
 requireroot() {
     [ "`id -u`" -eq 0 ] || die "Aborted: this action requires root access"
-}
-
-
-# Must run this before calling any of the below; Sets: $IOCPATH
-iocinit() {
-    IOCPATH=/etc/iocs
-    if [ -n "$SOFTBASE" ]
-    then
-        # Search in system locations first then user locations
-        IOCPATH="$IOCPATH:$SOFTBASE"
-    fi
-}
-
-
-# $1 /base/dir/and/iocname
-loadconfig() {
-    IOC="`basename $1`"
-    BASE="`dirname $1`"
-    if [ ! -r "$1/config" ]; then
-        echo "Missing config $1/config" >&2
-        return 1
-    fi
-    unset EXEC USER HOST
-    PORT=0
-    local INSTBASE="$1"
-    . "$1/config"
 }
 
 
@@ -166,51 +128,117 @@ reportone() {
 
 installioc() {
     IOC="$1"
-    BASE="`findbase "$IOC"`"
-    [ $? -ne 0 ] && die "Failed to find ioc $IOC"
-    echo "Installing IOC $BASE/$IOC"
-    #SCRIPT="$INITDDIR/softioc-$IOC"
-    SCRIPT="/etc/init.d/softioc-$IOC"
-    echo "As $SCRIPT"
-    if [ -h "$SCRIPT" ]
-    then
-        # old-style symlink
-        echo "Replacing existing symlink to `readlink "$SCRIPT"`"
-        rm -f "$SCRIPT" || die "Failed to remove symlink"
-    elif [ -f "$SCRIPT" ] && ! grep 'AUTOMATICALLYGENERATED' "$SCRIPT" &>/dev/null
+    IOCBASE="`findbase "$IOC"`"
+    [ $? -ne 0 -o -z "$IOCBASE" ] && 
+        die "Failed to find ioc $IOC in $IOCPATH: missing 'config' in $IOC?"
+
+    GLOBALBASE="$IOCBASE/config"
+    INSTBASE="$IOCBASE/$IOC"
+    # Modify environment before including global config
+    # NAME is the ioc instance name to be used for consistance checking
+    NAME=invalid
+    # PORT to be used by procServ
+    PORT=invalid
+    # USER to run procServ (if not set defaults to $IOC)
+    unset USER
+    # Computer that this softioc runs on.  Used to prevent copy+paste
+    # errors and duplicate PV names.  (optional)
+    unset HOST
+    unset CHDIR
+    unset EXEC
+    INSTCONF="$INSTBASE/config"
+    CHDIR="$INSTBASE"
+
+    if [ -f "$GLOBALBASE/config" ]; then
+	    cd "$GLOBALBASE"
+	    . "$GLOBALBASE/config"
+    fi
+
+    # thsese variables must be defined in $INSTCONF: NAME, PORT, HOST
+    cd "$INSTBASE" || die "Failed to cd to $INSTBASE"
+    . "$INSTCONF"
+
+    # provide defaults for things not set by any config
+    # default user name is softioc instance name
+    USER="${USER:-${IOC}}"
+    EXEC="${EXEC:-${CHDIR}/st.cmd}"
+
+    # consistency checking
+    [ "$NAME" = "invalid" ] && die "Configuration does not set IOC name"
+    [ "$NAME" = "$IOC" ] || die "Name '$NAME' does not match IOC instance ($IOC)"
+    [ "$PORT" = "invalid" ] && die "Configuration does not set port"
+    if [ -n "$HOST" ]; then
+      if [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" ]; then
+        die "This softioc instance runs on '$HOST' not this host '$(hostname -f)'"
+      fi
+    fi
+
+    # The official runtime environment
+    export HOSTNAME="$(hostname -s)"
+    export IOCNAME="$NAME"
+    export TOP="$INSTBASE"
+    #export EPICS_HOST_ARCH=`/usr/lib/epics/startup/EpicsHostArch`
+    export PROCPORT="$PORT"
+
+	# Needed so that the pid file can be written by $USER
+	# procServ will put in the correct pid
+    PID=$PIDDIR/softioc-$IOC.pid
+	touch $PID || die "Failed to create pid file"
+	chown "$USER" $PID || die "Failed to chown pid file"
+	# Ensure PID is readable so 'manage-iocs status' works for anyone
+	# regardless of the active umask when an ioc is restarted.
+	chmod a+r $PID || die "Failed to chmod pid file"
+
+	# create log directory if necessary
+    IOCLOGDIR=$LOGDIR/softioc/${IOC}
+	[ -d "$IOCLOGDIR" ] || install -d -m755 -o "$USER" "$IOCLOGDIR" \
+	|| echo "Warning: Failed to create directory: $IOCLOGDIR"
+
+    # procServ arguments: --foreground, --quiet, --chdir, --ignore ...    
+    PROCARGS="-f -q -c $CHDIR -i ^D^C^] -p $PID -n $IOC --restrict"
+    # By default write logfile.  Set to 0 or '' to disable.
+    LOG=1
+    if [ -n "$LOG" -a "$LOG" != 0 ]; then
+	    PROCARGS="$PROCARGS -L $IOCLOGDIR/$IOC.log"
+    fi
+
+    #if [ -n $CORESIZE ]; then
+	#    PROCARGS="$PROCARGS --coresize=$CORESIZE"
+    #fi
+
+    echo "Installing IOC $IOCBASE/$IOC ..."
+    SCRIPT="$SYSTEMDDIR/softioc-$IOC.service"
+    if [ -f "$SCRIPT" ] && ! grep 'AUTOMATICALLYGENERATED' "$SCRIPT" &>/dev/null
     then
         # script is a file and isn't automatically managed
         mv --backup=numbered "$SCRIPT" "$SCRIPT".old || die "failed to backup"
         echo "Backing up existing script"
     fi
+
     cat << EOF > "$SCRIPT"
-#!/bin/sh
 ## Notice
 # This file was generated by `basename $0`
 # on `date -R`
-# If you edit this file then remove the following line
-# to prevent automatic updates
+# If you edit this file, remove the following line to prevent automatic updates
 ## AUTOMATICALLYGENERATED
+[Unit]
+Description=IOC $IOC via procServ 
+After=network.target remote_fs.target local_fs.target syslog.target time.target
+ConditionFileIsExecutable=$PROCSERV
 
-### BEGIN INIT INFO
-# Provides:          softioc-$IOC
-# Required-Start:    \$remote_fs \$local_fs \$network \$syslog \$time
-# Required-Stop:     \$remote_fs \$local_fs \$network \$syslog
-# Should-Start:      \$named slapd autofs ypbind nscd nslcd
-# Should-Stop:       \$named slapd autofs ypbind nscd nslcd
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: An EPICS Soft IOC
-# Description:       Control a single software IOC
-### END INIT INFO
+[Service]
+User=$USER
+ExecStart=$PROCSERV $PROCARGS $PORT $EXEC
+#Restart=on-failure
 
-#. "$INITBASESCRIPT"
-. "/usr/local/sysv-rc-softioc/softioc"
+[Install]
+WantedBy=multi-user.target
+
 EOF
-    [ -f "$SCRIPT" -a -s "$SCRIPT" ] || die "Failed to create $SCRIPT"
-    chmod +x "$SCRIPT"
-    echo "Complete"
-    echo "To add the IOC to the system boot order run:"
-    echo " `basename $0` enable $IOC"
-}
 
+    [ -f "$SCRIPT" -a -s "$SCRIPT" ] || die "Failed to create $SCRIPT"
+    #chmod +x "$SCRIPT"
+    echo "  the unit file $SCRIPT has been created"
+    echo "To start the IOC:"
+    echo "  `basename $0` start $IOC"
+}

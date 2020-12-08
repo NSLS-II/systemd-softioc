@@ -1,11 +1,27 @@
 #!/bin/bash
 
-PATH="${PATH}:/usr/sbin"
+PATH="${PATH}:/sbin:/bin:/usr/sbin:/usr/bin"
 
-# functions
-. "/usr/local/sysv-rc-softioc/library.sh"
+function die {
+    echo "$1" >&2
+    exit 1
+}
+
+# the command 'manage-iocs' is a symlink; find the source directory;   
+SRCDIR="$(dirname "$(readlink -f "$0")")"
+
+# variable configuration: IOCPATH, PIDDIR, LOGDIR, PROCSERV, SYSTEMDDIR
+CONF=$SRCDIR/epics-softioc.conf
+[ -f "$CONF" ] || die "Aborted: missing $CONF"
+. "$CONF"
+
+# function library: usage, vist, reportone, requireroot, installioc  
+LIBRARY=$SRCDIR/library.sh
+[ -f "$LIBRARY" ] || die "Missing $LIBRARY"
+. "$LIBRARY"
 
 VERB=
+
 while getopts hvx arg
 do
     case $arg in
@@ -16,14 +32,10 @@ do
 done
 shift $(($OPTIND - 1))
 
-iocinit
-
-[ -n "$VERB" ] && echo "Searching in: $IOCPATH"
-
 cmd="$1"
 shift
+[ -n "$VERB" ] && echo "Searching in: $IOCPATH" && echo "Command: $cmd"
 
-[ -n "$VERB" ] && echo "Command: $cmd"
 
 case "$cmd" in
 report)
@@ -35,19 +47,15 @@ list)
     ;;
 
 status)
-    ls -1 /etc/init.d/softioc-*[^~] | while read ff
+    ls -1 $SYSTEMDDIR/softioc-*.service | while read ff
     do
-        printf "$ff\t\t"
-        IOC="`basename "$ff"`"
-        if $ff status &>/dev/null
-        then
+        unitfile="`basename "$ff"`"
+        printf "$unitfile\t\t"
+        systemctl -q is-active $unitfile
+        if [ $? -eq 0 ]; then
             printf "Running"
         else
             printf "Stopped"
-        fi
-        if ! ls /etc/rc*.d/*$IOC &>/dev/null
-        then
-            printf ".  Not registered"
         fi
         printf "\n"
     done
@@ -67,38 +75,76 @@ nextport)
 
 install)
     requireroot
+    [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
     installioc "$1"
     ;;
 
-enable)
+uninstall)
     requireroot
-    [ -z "$1" ] && die "Missing argument"
-    echo "Enable: softioc-$1"
-    #update-rc.d "softioc-$1" defaults 99
-    chkconfig --level 2345 "softioc-$1" on
+    [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
+    unitfile=$SYSTEMDDIR/softioc-$1.service
+    if [ -f $unitfile ]; then
+        rm -f $SYSTEMDDIR/softioc-$1.service || die "Failed to remove $unitfile"
+        echo "$unitfile is removed successfully"
+    else
+        die "Aborted: $unitfile does not exist"
+    fi
     ;;
 
-disable)
+start)
     requireroot
-    [ -z "$1" ] && die "Missing argument"
-    echo "Disable: softioc-$1"
-    #update-rc.d -f "softioc-$1" remove
-    chkconfig --del "softioc-$1"
+    [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
+    systemctl -q is-active softioc-$1.service
+    [ $? -eq 0 ] && die "The IOC $1 is already running"
+    echo "Starting the IOC $1 ..."
+    # update the unit file just in case the IOC's config file is changed
+    manage-iocs install $1 2>&1 >/dev/null
+    systemctl daemon-reload
+    systemctl start softioc-$1.service
+    sleep 1
+    systemctl -q is-active softioc-$1.service
+    if [ $? -eq 0 ]; then
+        echo "The IOC $1 has been started successfully"
+    else
+        die "Failed to start the IOC $1"
+    fi
+    ;;
+
+stop)
+    requireroot
+    [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
+    systemctl -q is-active softioc-$1.service
+    [ $? -ne 0 ] && die "The IOC $1 is already stopped"
+    echo "Stopping the IOC $1 ..."
+    systemctl stop softioc-$1.service
+    sleep 1
+    systemctl -q is-active softioc-$1.service
+    if [ $? -ne 0 ]; then
+        echo "The IOC $1 has been stopped successfully"
+    else
+        die "Failed to stop the IOC $1"
+    fi
     ;;
 
 stopall)
     requireroot
-    for initfile in /etc/init.d/softioc-*[^~]
+    ls -1 $SYSTEMDDIR/softioc-*.service | while read ff
     do
-        $initfile stop 
+        unitfile="`basename "$ff"`"
+        IOC=${unitfile#softioc-}
+        IOC=${IOC%.service}
+        manage-iocs stop $IOC
     done
     ;;
 
 startall)
     requireroot
-    for initfile in /etc/init.d/softioc-*[^~]
+    ls -1 $SYSTEMDDIR/softioc-*.service | while read ff
     do
-        $initfile start 
+        unitfile="`basename "$ff"`"
+        IOC=${unitfile#softioc-}
+        IOC=${IOC%.service}
+        manage-iocs start $IOC
     done
     ;;
 
@@ -106,7 +152,7 @@ help)
     usage
     ;;
 *)
-    [ "$cmd" ] && warn "Unknown command '$cmd'"
+    [ "$cmd" ] && echo "Unknown command '$cmd'"
     usage
     exit 1
     ;;
