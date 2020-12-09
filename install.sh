@@ -5,7 +5,11 @@ function die {
     exit 1
 }
 
-[ "`id -u`" -eq 0 ] || die "Aborted: this action requires root access"
+[ "`id -u`" -eq 0 ] || die "Aborted: this action requires root (sudo) access"
+
+#create a username 'softioc' (used in an IOC's config) if it doesn't exist
+id softioc &> /dev/null || useradd softioc
+
 
 #copy source files to $INSTALLDIR
 INSTALLDIR=/usr/local/systemd-softioc
@@ -22,24 +26,26 @@ ls -lht $INSTALLDIR
 
 #'manage-iocs' is a symbolic link
 SYMLINK=/usr/bin/manage-iocs
-printf "\nCreating the symlink $SYMLINK ...\n"
-if [ -f $SYMLINK ]; then
+if [ -f $SYMLINK -a "$(readlink -f $SYMLINK)" != $INSTALLDIR/manage-iocs ]; then
     ls -lh $SYMLINK
-    die "There is already $SYMLINK. Please verify it and manually remove it. \
-Then type 'sudo ./install.sh' again to reinstall this package"
+    die "There is already a symlink: $SYMLINK->$(readlink -f $SYMLINK). \
+Please manually remove it. Then type 'sudo ./install.sh' to reinstall this package"
 fi
 
+printf "\nCreating the symlink $SYMLINK ...\n"
 rm -f $SYMLINK || die "Failed to remove $SYMLINK"
 ln -s $INSTALLDIR/manage-iocs $SYMLINK || die "Failed to create $SYMLINK"
-printf "Successfully created the symlink $SYMLINK\n\n"
+printf "Successfully created the symlink: $SYMLINK -> $(readlink -f $SYMLINK)\n\n"
 
 
 #get, build and install procServ
-[ -f /usr/bin/procServ ] && die "procServ is already installed"
+#[ -f /usr/bin/procServ ] && die "procServ is already installed"
 PROCSERVGIT="https://github.com/ralphlange/procServ.git"
 PROCSERVDIR=/tmp/procServ
 cd /tmp
 [ -d $PROCSERVDIR ] && rm -fR $PROCSERVDIR || die "Failed to remove $PROCSERVDIR"
+
+echo "Building procServ ..."
 git clone $PROCSERVGIT
 cd procServ
 
