@@ -3,9 +3,10 @@ PORT=telnet-port-number
 USER=softioc
 HOST=the-server-name-where-your-IOC-runs
 
-# use "manage-iocs nextport" to get telnet-port-number
-# use "hostname" to get the-server-name-where-your-IOC-runs
-# to log in the EPICS console/shell, type "telnet localhost telnet-port-number", 
+# Use "manage-iocs nextport" to get telnet-port-number;
+# Use "hostname" to get the-server-name-where-your-IOC-runs;
+# If you put a file "st.cmd" in /epics/iocs/$NAME, no need to set CHDIR and EXEC;
+# To log in the EPICS console/shell, type "telnet localhost telnet-port-number", 
 ## then hit Enter and you will see "epics>"; to restart the softIOC, type "exit"
 ## or "Ctrl+X"; to quit the shell (return to your terminal), "Ctrl+]", 
 ## you will see "telnet>", then type "q"
@@ -16,8 +17,9 @@ HOST=the-server-name-where-your-IOC-runs
 #NAME=myioc
 #PORT=4050
 
-# USER: User name to run the IOC; create and use a generic username "softioc"
-# or use any existing username or manually create a username for each softioc instance.
+# USER: User name to run the IOC; use "softioc" which should have been created 
+# by "install.sh". 
+# Or use any existing username or manually create a username for each softioc instance.
 # if USER is not set, it is default to $NAME (softIoc name)
 #USER=softioc
 
