@@ -1,52 +1,41 @@
-# softIoc name and port must be unique on the
-# server where it runs.  It is required that
-# the name be unique.
-#
-# The port is the one used by procServ for its
-# telnet server.
-#
-NAME=myioc
-PORT=4050
+NAME=your-IOC-name
+PORT=telnet-port-number
+USER=softioc
+HOST=the-server-name-where-your-IOC-runs
 
-# User name to run the IOC
-# create and use a generic username "softioc"
-# or use any existing username
-# or manually create a username for each softioc instance
-#
-# Defaults to $NAME
-#
+# use "manage-iocs nextport" to get telnet-port-number
+# use "hostname" to get the-server-name-where-your-IOC-runs
+# to log in the EPICS console/shell, type "telnet localhost telnet-port-number", 
+## then hit Enter and you will see "epics>"; to restart the softIOC, type "exit"
+## or "Ctrl+X"; to quit the shell (return to your terminal), "Ctrl+]", 
+## you will see "telnet>", then type "q"
+
+
+# softIoc name (NAME) and port (PORT) must be unique on the server where it runs.  
+# The port is the one used by procServ for its telnet server.
+#NAME=myioc
+#PORT=4050
+
+# USER: User name to run the IOC; create and use a generic username "softioc"
+# or use any existing username or manually create a username for each softioc instance.
+# if USER is not set, it is default to $NAME (softIoc name)
 #USER=softioc
 
-# Name of the server on which this softIoc
-# will run.  This is used for error checking
-# to prevent the instance from being run on
-# the wrong server.
-#
-# If not set then the check is disabled
-#
+# HOST: name of the server on which this softIoc will run. This is used for error 
+# checking to prevent the instance from being run on the wrong server.
+# If not set then the check is disabled.
 #HOST=myserver.domain.com
 
-# IOC executable name.  This is the command
-# given to procServ to start the IOC.
-#
-# Defaults to st.cmd in the IOC's top directory (i.e. /epics/iocs/myioc)
-#
-#EXEC="$CHDIR/st.cmd"
-
-# IOC run directory.  The directory in which
-# procServ will start the IOC.  It is permissable
-# to modify or replace the value.
-# eg. CHDIR="$CHDIR/iocBoot/iocexample"
-#
-# Defaults to '/youriocbasedir/$NAME'
-#   (the directory containing this file)
-#
+# CHDIR: IOC run directory in which procServ will start the IOC. It is permissable
+# to modify or replace the value. eg. CHDIR="$CHDIR/iocBoot/iocexample".
+# Defaults to '/$IOCPATH/$NAME' (/epics/iocs/example).
 #CHDIR="$CHDIR"
 
-# Write a core file if process crashes and the size
-# of the corefile is not more than the value given
-# in bytes.
-#
-# By default no core files are generated.
-#
+# EXEC: IOC executable name (startup script). This is the command given to 
+# procServ to start the IOC. Defaults to the file st.cmd in the IOC's top directory.
+#EXEC="$CHDIR/st.cmd"
+
+
+# Write a core file if process crashes and the size of the corefile is not more 
+# than the value given in bytes. By default no core files are generated.
 #CORESIZE=10000000
