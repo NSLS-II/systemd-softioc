@@ -4,7 +4,7 @@ usage() {
     printf "Usage: %s [-v] [-x] cmd\n" `basename $0`
     echo "Available commands:"
     echo "  help            - display this message"
-    echo "  report [ioc]    - Show config of all/an IOC on localhost"
+    echo "  report [ioc]    - Show config(s) of all/an IOC on localhost"
     echo "  status          - Check if IOCs are running"
     echo "  nextport        - Find the next unused procServ port"
     echo "  install <ioc>   - Create /etc/systemd/system/softioc-[ioc].service"
@@ -13,9 +13,9 @@ usage() {
     echo "  stop <ioc>      - Stop the IOC <ioc>"
     echo "  startall        - Start all IOCs installed for this system"
     echo "  stopall         - Stop all IOCs installed for this system"
-    echo "  list            - a list of IOC instances under $IOCPATH;\
+    echo "  list            - a list of IOC instances under $IOCBASE;\
  may be different from 'manage-iocs report'"
-    #exit 2
+    exit 2
 }
 
 
@@ -26,7 +26,7 @@ requireroot() {
 
 # Run command $1 on IOC all instances
 # $1 - A shell command
-# $2 - IOC name (empty for all IOCs)
+# $2 - one and only one IOC name (empty for all IOCs)
 visit() {
     [ -z "$1" ] && die "visitall: missing argument"
     vcmd="$1"
@@ -36,7 +36,7 @@ visit() {
 
     save_IFS="$IFS"
     IFS=':'
-    for ent in $IOCPATH
+    for ent in $IOCBASE
     do
         IFS="$save_IFS"
         [ -z "$ent" -o ! -d "$ent" ] && continue
@@ -59,12 +59,12 @@ visit() {
 # prints a single line which is a directory, which contains '$IOC/config'
 # $1 - IOC name
 findbase() {
-    [ -z "$1" ] && die "visitall: missing argument"
+    [ -z "$1" ] && die "findbase: missing argument"
     IOC="$1"
 
     save_IFS="$IFS"
     IFS=':'
-    for ent in $IOCPATH
+    for ent in $IOCBASE
     do
         IFS="$save_IFS"
         [ -z "$ent" -o ! -d "$ent" ] && continue
@@ -78,19 +78,14 @@ findbase() {
 }
 
 
-# Print an IOC instance config: BASEDIR  IOCNAME  USER  PORT  CMD  [HOSTNAME]
+# Print an IOC instance config on localhost: BASEDIR  IOCNAME  USER  PORT  CMD
 # $1 - iocdir (i.e. /epics/iocs/example)
-# $2 - optional
 reportone() {
-    # print header
+    [ $# -ge 2 ] && echo "only one IOC instance ($1) is reported: "
+
+    # print header once
     if [ -z "$HEADER" ]; then
-        case "$2" in
-        conserver) # no header
-            ;;
-        *)
-            printf "%-15s | %-15s | %-15s | %5s | %s\n" BASE IOC USER PORT EXEC
-            ;;
-        esac
+        printf "%-15s | %-15s | %-15s | %5s | %s\n" BASE IOC USER PORT EXEC
         export HEADER=1
     fi
 
@@ -110,27 +105,7 @@ reportone() {
     USER="${USER:-${IOC}}"
     EXEC="${EXEC:-${INSTBASE}/st.cmd}"
 
-    case "$2" in
-    conserver)
-        # skip IOC which don't specify a host
-        [ -n "$HOST" -a -n "$PORT" ] || continue
-        # identify if this is the host system
-        [ "$HOST" = "$(hostname -s)" -o "$HOST" = "$(hostname -f)" ] \
-            && HOST=localhost || continue
-        echo "console $IOC {include softioc; master $HOST; port $PORT;}"
-        ;;
-    all)
-        [ -n "$HOST" ] || HOST="<anywhere>"
-        printf "%-15s | %-15s | %-15s | %-5s | %5s | %s\n" $BASE $IOC $USER \
-            $PORT $EXEC $HOST
-        ;;
-    *)
-        [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" \
-            -a -n "$HOST" ] && return 0
-        [ -n "$HOST" ] || HOST="<anywhere>"
-        printf "%-15s | %-15s | %-15s | %5s | %s\n" $BASE $IOC $USER $PORT $EXEC
-        ;;
-    esac
+    printf "%-15s | %-15s | %-15s | %5s | %s\n" $BASE $IOC $USER $PORT $EXEC
 }
 
 
@@ -138,7 +113,7 @@ installioc() {
     IOC="$1"
     IOCBASE="`findbase "$IOC"`"
     [ $? -ne 0 -o -z "$IOCBASE" ] && 
-        die "Failed to find ioc $IOC in $IOCPATH: missing 'config' in $IOC?"
+        die "Failed to find ioc $IOC in $IOCBASE: missing 'config' in $IOC?"
 
     GLOBALBASE="$IOCBASE/config"
     INSTBASE="$IOCBASE/$IOC"
@@ -169,15 +144,26 @@ installioc() {
     # provide defaults for things not set by any config
     # default user name is softioc instance name
     USER="${USER:-${IOC}}"
+    id $USER &> /dev/null || \
+        die "Aborted: the user '$USER' does not exist; please set USER in "$INSTCONF""
+
     EXEC="${EXEC:-${CHDIR}/st.cmd}"
+    [ -r $EXEC ] || die "Aborted: the startup script $EXEC does not exist"
 
     # consistency checking
-    [ "$NAME" = "invalid" ] && die "Configuration does not set IOC name"
-    [ "$NAME" = "$IOC" ] || die "Name '$NAME' does not match IOC instance ($IOC)"
-    [ "$PORT" = "invalid" ] && die "Configuration does not set port"
+    [ "$NAME" = "invalid" ] && die "Aborted: configuration does not set IOC name"
+    [ "$NAME" = "$IOC" ] || die "Aborted: Wrong NAME('$NAME') set in "$INSTCONF""
+    
+    # check if telnet PORT is already being used
+    [ "$PORT" = "invalid" ] && die "Aborted: configuration does not set port"
+    # ports: a string, not an array
+    ports="`visit reportone "" | grep -vw "$NAME" | awk '{print $7}' ORS=' '| sort -n`"
+    #echo "$ports"
+    [[ $ports == *$PORT* ]] && die "Aborted: PORT $PORT is already being used"
+    
     if [ -n "$HOST" ]; then
       if [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" ]; then
-        die "This softioc instance runs on '$HOST' not this host '$(hostname -f)'"
+        die "Aborted: Wrong HOST('$HOST') set in "$INSTCONF""
       fi
     fi
 

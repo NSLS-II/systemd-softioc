@@ -10,7 +10,7 @@ function die {
 # the command 'manage-iocs' is a symlink; find the source directory;   
 SRCDIR="$(dirname "$(readlink -f "$0")")"
 
-# variable configuration: IOCPATH, PIDDIR, LOGDIR, PROCSERV, SYSTEMDDIR
+# variable configuration: IOCBASE, PIDDIR, LOGDIR, PROCSERV, SYSTEMDDIR
 CONF="$SRCDIR/epics-softioc.conf"
 [ -f "$CONF" ] && . "$CONF" || die "Aborted: missing $CONF"
 
@@ -33,7 +33,7 @@ shift $(($OPTIND - 1))
 
 cmd="$1"
 shift
-[ -n "$VERB" ] && echo "Searching in: $IOCPATH" && echo "Command: $cmd"
+[ -n "$VERB" ] && echo "Searching in: $IOCBASE" && echo "Command: $cmd"
 
 
 case "$cmd" in
@@ -42,18 +42,20 @@ help)
     ;;
 
 report)
-    visit reportone "$@"
-
-    # report duplicated ports
-    #ports="`visit reportone "" | awk '{print $7}' ORS=' ' | sort -n`"
-    ports="`visit reportone "" | awk '{print $7}' | sort -n`"
-    #echo "${ports[@]}"
-    d_ports="$(printf '%s\n' "${ports[@]}" | awk '!($0 in seen){seen[$0];next} 1')"
-    if [ -n "$d_ports" ]; then
-        printf "\nWARNING: there are duplicated telnet ports: "
-        echo $d_ports
-        printf "\tYou have to use a unique port for each IOC instance\n"
-    fi 
+    visit reportone "$@" 
+    
+    if [ $# -eq 0 ]; then
+        # report duplicated ports
+        #ports="`visit reportone "" | awk '{print $7}' ORS=' ' | sort -n`"
+        ports="`visit reportone "" | awk '{print $7}' | sort -n`"
+        #echo "${ports[@]}"
+        d_ports="$(printf '%s\n' "${ports[@]}" | awk '!($0 in seen){seen[$0];next} 1')"
+        if [ -n "$d_ports" ]; then
+            printf "\nWARNING: duplicated telnet ports are being used: "
+            echo $d_ports
+            printf "\tYou have to use a unique port for each IOC instance\n"
+        fi 
+    fi
     ;;
 
 status)
