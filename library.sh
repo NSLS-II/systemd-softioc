@@ -4,7 +4,7 @@ usage() {
     printf "Usage: %s [-v] [-x] cmd\n" `basename $0`
     echo "Available commands:"
     echo "  help            - display this message"
-    echo "  report [ioc]    - Show config of all/an IOC"
+    echo "  report [ioc]    - Show config of all/an IOC on localhost"
     echo "  status          - Check if IOCs are running"
     echo "  nextport        - Find the next unused procServ port"
     echo "  install <ioc>   - Create /etc/systemd/system/softioc-[ioc].service"
@@ -13,7 +13,9 @@ usage() {
     echo "  stop <ioc>      - Stop the IOC <ioc>"
     echo "  startall        - Start all IOCs installed for this system"
     echo "  stopall         - Stop all IOCs installed for this system"
-    exit 2
+    echo "  list            - a list of IOC instances under $IOCPATH;\
+ may be different from 'manage-iocs report'"
+    #exit 2
 }
 
 
@@ -76,9 +78,11 @@ findbase() {
 }
 
 
-# Print IOC instance config: BASEDIR  IOCNAME  USER  PORT  HOSTNAME  CMD
-# $1 - iocdir
+# Print an IOC instance config: BASEDIR  IOCNAME  USER  PORT  CMD  [HOSTNAME]
+# $1 - iocdir (i.e. /epics/iocs/example)
+# $2 - optional
 reportone() {
+    # print header
     if [ -z "$HEADER" ]; then
         case "$2" in
         conserver) # no header
@@ -89,19 +93,23 @@ reportone() {
         esac
         export HEADER=1
     fi
-    local IOC="`basename $1`"
-    local BASE="`dirname $1`"
+
+    # may not need the following check
     if [ ! -r "$1/config" ]; then
         echo "Missing config $1/config" >&2
         return 1
     fi
+
     unset EXEC USER HOST
     PORT=0
+    local IOC="`basename $1`"
+    local BASE="`dirname $1`"
     local INSTBASE="$1"
-    CHDIR="$1"
+    #CHDIR="$1"
     . "$1/config"
     USER="${USER:-${IOC}}"
     EXEC="${EXEC:-${INSTBASE}/st.cmd}"
+
     case "$2" in
     conserver)
         # skip IOC which don't specify a host
@@ -113,8 +121,8 @@ reportone() {
         ;;
     all)
         [ -n "$HOST" ] || HOST="<anywhere>"
-        printf "%-15s | %-15s | %-15s | %-15s | %5s | %s\n" $BASE $HOST $IOC \
-            $USER $PORT $EXEC
+        printf "%-15s | %-15s | %-15s | %-5s | %5s | %s\n" $BASE $IOC $USER \
+            $PORT $EXEC $HOST
         ;;
     *)
         [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" \

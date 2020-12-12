@@ -11,13 +11,12 @@ function die {
 SRCDIR="$(dirname "$(readlink -f "$0")")"
 
 # variable configuration: IOCPATH, PIDDIR, LOGDIR, PROCSERV, SYSTEMDDIR
-CONF=$SRCDIR/epics-softioc.conf
-[ -f "$CONF" ] || die "Aborted: missing $CONF"
-. "$CONF"
+CONF="$SRCDIR/epics-softioc.conf"
+[ -f "$CONF" ] && . "$CONF" || die "Aborted: missing $CONF"
 
 # function library: usage, vist, reportone, requireroot, installioc  
-LIBRARY=$SRCDIR/library.sh
-[ -f "$LIBRARY" ] || die "Missing $LIBRARY"
+LIBRARY="$SRCDIR/library.sh"
+[ -f "$LIBRARY" ] || die "Aborted: missing $LIBRARY"
 . "$LIBRARY"
 
 VERB=
@@ -38,12 +37,23 @@ shift
 
 
 case "$cmd" in
-report)
-    visit reportone "$@"
+help)
+    usage
     ;;
 
-list)
-    visit echo "$1"
+report)
+    visit reportone "$@"
+
+    # report duplicated ports
+    #ports="`visit reportone "" | awk '{print $7}' ORS=' ' | sort -n`"
+    ports="`visit reportone "" | awk '{print $7}' | sort -n`"
+    #echo "${ports[@]}"
+    d_ports="$(printf '%s\n' "${ports[@]}" | awk '!($0 in seen){seen[$0];next} 1')"
+    if [ -n "$d_ports" ]; then
+        printf "\nWARNING: there are duplicated telnet ports: "
+        echo $d_ports
+        printf "\tYou have to use a unique port for each IOC instance\n"
+    fi 
     ;;
 
 status)
@@ -126,17 +136,6 @@ stop)
     fi
     ;;
 
-stopall)
-    requireroot
-    ls -1 $SYSTEMDDIR/softioc-*.service | while read ff
-    do
-        unitfile="`basename "$ff"`"
-        IOC=${unitfile#softioc-}
-        IOC=${IOC%.service}
-        manage-iocs stop $IOC
-    done
-    ;;
-
 startall)
     requireroot
     ls -1 $SYSTEMDDIR/softioc-*.service | while read ff
@@ -148,9 +147,21 @@ startall)
     done
     ;;
 
-help)
-    usage
+stopall)
+    requireroot
+    ls -1 $SYSTEMDDIR/softioc-*.service | while read ff
+    do
+        unitfile="`basename "$ff"`"
+        IOC=${unitfile#softioc-}
+        IOC=${IOC%.service}
+        manage-iocs stop $IOC
+    done
     ;;
+
+list)
+    visit echo "$1"
+    ;;
+
 *)
     [ "$cmd" ] && echo "Unknown command '$cmd'"
     usage
