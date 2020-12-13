@@ -5,7 +5,7 @@ usage() {
     echo "Available commands:"
     echo "  help            - display this message"
     echo "  report [ioc]    - Show config(s) of all/an IOC on localhost"
-    echo "  status          - Check if IOCs are running"
+    echo "  status          - Check if installed IOCs are running or stopped"
     echo "  nextport        - Find the next unused procServ port"
     echo "  install <ioc>   - Create /etc/systemd/system/softioc-[ioc].service"
     echo "  uninstall <ioc> - Remove /etc/systemd/system/softioc-[ioc].service"
@@ -13,8 +13,8 @@ usage() {
     echo "  stop <ioc>      - Stop the IOC <ioc>"
     echo "  startall        - Start all IOCs installed for this system"
     echo "  stopall         - Stop all IOCs installed for this system"
-    echo "  list            - a list of IOC instances under $IOCBASE;\
- may be different from 'manage-iocs report'"
+    echo "  list            - a list of IOC instances under $IOCPATH;"
+    echo "                    including those IOCs running on other hosts"
     exit 2
 }
 
@@ -36,7 +36,7 @@ visit() {
 
     save_IFS="$IFS"
     IFS=':'
-    for ent in $IOCBASE
+    for ent in $IOCPATH
     do
         IFS="$save_IFS"
         [ -z "$ent" -o ! -d "$ent" ] && continue
@@ -64,7 +64,7 @@ findbase() {
 
     save_IFS="$IFS"
     IFS=':'
-    for ent in $IOCBASE
+    for ent in $IOCPATH
     do
         IFS="$save_IFS"
         [ -z "$ent" -o ! -d "$ent" ] && continue
@@ -105,6 +105,10 @@ reportone() {
     USER="${USER:-${IOC}}"
     EXEC="${EXEC:-${INSTBASE}/st.cmd}"
 
+    #only report an IOC instance on localhost
+    #[ -z "$HOST" ] && echo "Warning: HOST is not set on $INSTBASE" && return 0
+    #[ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" -a -n "$HOST" ] && return 0
+    [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" ] && return 0
     printf "%-15s | %-15s | %-15s | %5s | %s\n" $BASE $IOC $USER $PORT $EXEC
 }
 
@@ -113,22 +117,24 @@ installioc() {
     IOC="$1"
     IOCBASE="`findbase "$IOC"`"
     [ $? -ne 0 -o -z "$IOCBASE" ] && 
-        die "Failed to find ioc $IOC in $IOCBASE: missing 'config' in $IOC?"
+        die "Aborted: no '$IOC' or '$IOC/config' in '$IOCPATH'"
 
-    GLOBALBASE="$IOCBASE/config"
-    INSTBASE="$IOCBASE/$IOC"
+    # Thsese variables must have valid/proper values: NAME, PORT, USER, HOST
     # Modify environment before including global config
     # NAME is the ioc instance name to be used for consistance checking
     NAME=invalid
-    # PORT to be used by procServ
+    # PORT (telnet port) to be used by procServ; must be a unique number
     PORT=invalid
-    # USER to run procServ (if not set defaults to $IOC)
+    # USER to run procServ; the account USER must exist
     unset USER
-    # Computer that this softioc runs on.  Used to prevent copy+paste
-    # errors and duplicate PV names.  (optional)
+    # HOST: computer that this softioc runs on. Used to prevent copy+paste
+    # errors and duplicate PV names
     unset HOST
     unset CHDIR
     unset EXEC
+
+    GLOBALBASE="$IOCBASE/config"
+    INSTBASE="$IOCBASE/$IOC"
     INSTCONF="$INSTBASE/config"
     CHDIR="$INSTBASE"
 
@@ -137,35 +143,36 @@ installioc() {
 	    . "$GLOBALBASE/config"
     fi
 
-    # thsese variables must be defined in $INSTCONF: NAME, PORT, HOST
+    # thsese variables must be explicitly set in $INSTCONF: NAME, PORT, HOST
     cd "$INSTBASE" || die "Failed to cd to $INSTBASE"
     . "$INSTCONF"
 
-    # provide defaults for things not set by any config
-    # default user name is softioc instance name
-    USER="${USER:-${IOC}}"
-    id $USER &> /dev/null || \
-        die "Aborted: the user '$USER' does not exist; please set USER in "$INSTCONF""
-
-    EXEC="${EXEC:-${CHDIR}/st.cmd}"
-    [ -r $EXEC ] || die "Aborted: the startup script $EXEC does not exist"
-
     # consistency checking
-    [ "$NAME" = "invalid" ] && die "Aborted: configuration does not set IOC name"
-    [ "$NAME" = "$IOC" ] || die "Aborted: Wrong NAME('$NAME') set in "$INSTCONF""
+    [ "$NAME" = "invalid" ] && die "Aborted: NAME is not set in '$INSTCONF'"
+    [ "$NAME" = "$IOC" ] || die "Aborted: Wrong NAME('$NAME') set in '$INSTCONF';\
+ it should be $IOC"
     
     # check if telnet PORT is already being used
-    [ "$PORT" = "invalid" ] && die "Aborted: configuration does not set port"
+    [ "$PORT" = "invalid" ] && die "Aborted: PORT is not set in '$INSTCONF'"
     # ports: a string, not an array
     ports="`visit reportone "" | grep -vw "$NAME" | awk '{print $7}' ORS=' '| sort -n`"
     #echo "$ports"
-    [[ $ports == *$PORT* ]] && die "Aborted: PORT $PORT is already being used"
+    [[ $ports == *$PORT* ]] && die "Aborted: PORT $PORT is already being used;\
+ type 'manage-iocs nextport' to find out an available port"
     
-    if [ -n "$HOST" ]; then
-      if [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" ]; then
-        die "Aborted: Wrong HOST('$HOST') set in "$INSTCONF""
-      fi
-    fi
+    [ -z "$HOST" ] && die "Aborted: HOST is not set in '$INSTCONF'"
+    [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" ] && 
+die "Aborted: Wrong HOST('$HOST') set in '$INSTCONF'; it should be "$(hostname -s)""
+
+    # provide defaults for things not set by any config: USER, EXEC
+    # default user name is softioc instance name
+    USER="${USER:-${IOC}}"
+    id $USER &> /dev/null || \
+        die "Aborted: the user account '$USER' does not exist;\
+ please set USER to an existing account (e.g. 'softioc') in "$INSTCONF""
+
+    EXEC="${EXEC:-${CHDIR}/st.cmd}"
+    [ -r $EXEC ] || die "Aborted: the startup script $EXEC does not exist"
 
     # The official runtime environment
     export HOSTNAME="$(hostname -s)"
