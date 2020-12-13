@@ -4,7 +4,7 @@ usage() {
     printf "Usage: %s [-v] [-x] cmd\n" `basename $0`
     echo "Available commands:"
     echo "  help            - display this message"
-    echo "  report [ioc]    - Show config(s) of all/an IOC on localhost"
+    echo "  report [ioc]    - Show config(s) of an IOC/all IOCs on localhost"
     echo "  status          - Check if installed IOCs are running or stopped"
     echo "  nextport        - Find the next unused procServ port"
     echo "  install <ioc>   - Create /etc/systemd/system/softioc-[ioc].service"
@@ -13,7 +13,7 @@ usage() {
     echo "  stop <ioc>      - Stop the IOC <ioc>"
     echo "  startall        - Start all IOCs installed for this system"
     echo "  stopall         - Stop all IOCs installed for this system"
-    echo "  list            - a list of IOC instances under $IOCPATH;"
+    echo "  list            - a list of all IOC instances under $IOCPATH;"
     echo "                    including those IOCs running on other hosts"
     exit 2
 }
@@ -100,10 +100,10 @@ reportone() {
     local IOC="`basename $1`"
     local BASE="`dirname $1`"
     local INSTBASE="$1"
-    #CHDIR="$1"
+    CHDIR="$1"
     . "$1/config"
     USER="${USER:-${IOC}}"
-    EXEC="${EXEC:-${INSTBASE}/st.cmd}"
+    EXEC="${EXEC:-${CHDIR}/st.cmd}"
 
     #only report an IOC instance on localhost
     #[ -z "$HOST" ] && echo "Warning: HOST is not set on $INSTBASE" && return 0

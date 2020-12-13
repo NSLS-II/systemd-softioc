@@ -10,7 +10,7 @@ function die {
 # the command 'manage-iocs' is a symlink; find the source directory;   
 SRCDIR="$(dirname "$(readlink -f "$0")")"
 
-# variable configuration: IOCBASE, PIDDIR, LOGDIR, PROCSERV, SYSTEMDDIR
+# variable configuration: IOCPATH, PIDDIR, LOGDIR, PROCSERV, SYSTEMDDIR
 CONF="$SRCDIR/epics-softioc.conf"
 [ -f "$CONF" ] && . "$CONF" || die "Aborted: missing $CONF"
 
@@ -62,14 +62,25 @@ status)
     ls -1 $SYSTEMDDIR/softioc-*.service | while read ff
     do
         unitfile="`basename "$ff"`"
+        result="$(systemctl is-active $unitfile)"
+        # one has to use 'sudo ...' on old CentOS (7.8)
+        [ $result = "unknown" ] && echo "Type 'sudo manage-iocs status'" && continue
         printf "$unitfile\t\t"
-        systemctl -q is-active $unitfile
-        if [ $? -eq 0 ]; then
-            printf "Running"
-        else
-            printf "Stopped"
-        fi
-        printf "\n"
+        #systemctl -q is-active $unitfile
+        #if [ $? -eq 0 ]; then
+        [ $result = "active" ] && printf "Running\n" || printf "Stopped\n"
+
+        # consistency checking in case something changed on the IOC  
+        IOC=${unitfile#softioc-}
+        IOC=${IOC%.service}
+        IOCBASE="`findbase "$IOC"`"
+        [ $? -ne 0 -o -z "$IOCBASE" ] && 
+            printf "Warning: no '$IOC' or '$IOC/config' in '$IOCPATH'; please\
+ confirm the IOC setup and uninstall $IOC if needed\n\n" && continue
+        . "$IOCBASE/$IOC/config"
+        [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" ] && 
+            printf "Warning: HOST in $IOCBASE/$IOC/config is changed to $HOST;\
+ please confirm the IOC setup and uninstall $IOC if needed\n\n"        
     done
     ;;
 
