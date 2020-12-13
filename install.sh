@@ -39,7 +39,9 @@ printf "Successfully created the symlink: $SYMLINK -> $(readlink -f $SYMLINK)\n\
 
 
 #get, build and install procServ
-#[ -f /usr/bin/procServ ] && die "procServ is already installed"
+[ -f /usr/bin/procServ ] && read -p "procServ is already installed in /usr/bin. \
+Do you want to remove it and install a new one? Type 'yes' or 'no'. " answer
+[ $answer != 'yes' ] && die "Done."
 PROCSERVGIT="https://github.com/ralphlange/procServ.git"
 PROCSERVDIR=/tmp/procServ
 cd /tmp
