@@ -41,11 +41,11 @@ printf "Successfully created the symlink: $SYMLINK -> $(readlink -f $SYMLINK)\n\
 #get, build and install procServ
 [ -f /usr/bin/procServ ] && read -p "procServ is already installed in /usr/bin. \
 Do you want to remove it and install a new one? Type 'yes' or 'no'. " answer
-[ $answer != 'yes' ] && die "Done."
+[ ! $answer = 'yes' ] && die "Done."
 PROCSERVGIT="https://github.com/ralphlange/procServ.git"
 PROCSERVDIR=/tmp/procServ
 cd /tmp
-[ -d $PROCSERVDIR ] && rm -fR $PROCSERVDIR || die "Failed to remove $PROCSERVDIR"
+[ -d $PROCSERVDIR ] && { rm -fR $PROCSERVDIR || die "Failed to remove $PROCSERVDIR"; }
 
 echo "Building procServ ..."
 git clone $PROCSERVGIT
