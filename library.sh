@@ -152,13 +152,17 @@ installioc() {
     [ "$NAME" = "$IOC" ] || die "Aborted: Wrong NAME('$NAME') set in '$INSTCONF';\
  it should be $IOC"
     
-    # check if telnet PORT is already being used
+    # check if telnet PORT is a number and a unique number
     [ "$PORT" = "invalid" ] && die "Aborted: PORT is not set in '$INSTCONF'"
+    case $PORT in
+    ''|*[!0-9]*) die "Aborted: PORT($PORT) is not a number in $INSTCONF'" ;;
+    esac
     # ports: a string, not an array
     ports="`visit reportone "" | grep -vw "$NAME" | awk '{print $7}' ORS=' '| sort -n`"
-    #echo "$ports"
-    [[ $ports == *$PORT* ]] && die "Aborted: PORT $PORT is already being used;\
- type 'manage-iocs nextport' to find out an available port"
+    case "$ports" in 
+    *$PORT*) die "Aborted: PORT $PORT is already being used; type 'manage-iocs nextport'\
+ to find out next available port";;
+    esac
     
     [ -z "$HOST" ] && die "Aborted: HOST is not set in '$INSTCONF'"
     [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" ] && 

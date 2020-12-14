@@ -64,7 +64,7 @@ status)
         unitfile="`basename "$ff"`"
         result="$(systemctl is-active $unitfile)"
         # one has to use 'sudo ...' on old CentOS (7.8)
-        [ $result = "unknown" ] && echo "Type 'sudo manage-iocs status'" && continue
+        [ $result = "unknown" ] && { echo "Type 'sudo manage-iocs status'"; continue; } 
         printf "$unitfile\t\t"
         #systemctl -q is-active $unitfile
         #if [ $? -eq 0 ]; then
@@ -75,8 +75,8 @@ status)
         IOC=${IOC%.service}
         IOCBASE="`findbase "$IOC"`"
         [ $? -ne 0 -o -z "$IOCBASE" ] && 
-            printf "Warning: no '$IOC' or '$IOC/config' in '$IOCPATH'; please\
- confirm the IOC setup and uninstall $IOC if needed\n\n" && continue
+            { printf "Warning: no '$IOC' or '$IOC/config' in '$IOCPATH'; please\
+ confirm the IOC setup and uninstall $IOC if needed\n\n"; continue; }
         . "$IOCBASE/$IOC/config"
         [ "$HOST" != "$(hostname -s)" -a "$HOST" != "$(hostname -f)" ] && 
             printf "Warning: HOST in $IOCBASE/$IOC/config is changed to $HOST;\
@@ -87,13 +87,7 @@ status)
 nextport)
     # Find the highest port in use and add one.
     LAST="`visit reportone "$1" | tail -n '+2' | awk '{print $7}' | sort -n | tail -n1`"
-    if [ -n "$LAST" ] && [ "$LAST" -ne 0 ]
-    then
-        # print next port
-        expr "$LAST" '+' 1
-    else
-        echo 4050
-    fi
+    [ -n "$LAST" -a "$LAST" -ne 0 ] && expr "$LAST" '+' 1 || echo 4050
     ;;
 
 install)
@@ -129,7 +123,7 @@ start)
     if [ $? -eq 0 ]; then
         echo "The IOC $1 has been started successfully"
     else
-        die "Failed to start the IOC $1"
+        die "Failed to start the IOC $1; type 'sudo journalctl -xe' for details."
     fi
     ;;
 
@@ -145,7 +139,7 @@ stop)
     if [ $? -ne 0 ]; then
         echo "The IOC $1 has been stopped successfully"
     else
-        die "Failed to stop the IOC $1"
+        die "Failed to stop the IOC $1; type 'sudo journalctl -xe' for details."
     fi
     ;;
 
