@@ -23,6 +23,8 @@ cp ./manage-iocs $INSTALLDIR
 echo "Source files are successfully copied to $INSTALLDIR. See below:"
 ls -lht $INSTALLDIR
 
+#install epics-softioc.logrotate
+cp epics-softioc.logrotate /etc/logrotate.d || die "Failed to setup logrotate"
 
 #'manage-iocs' is a symbolic link
 SYMLINK=/usr/bin/manage-iocs

@@ -1,0 +1,11 @@
+/var/log/softioc/*/*.log {
+    rotate 14
+    delaycompress
+    missingok
+    notifempty
+    size 10000000
+    sharedscripts
+    postrotate
+        /usr/bin/killall -HUP procServ
+    endscript
+}
