@@ -53,6 +53,7 @@ $ manage-iocs help
       startall        - Start all IOCs installed for this system
 
       stopall         - Stop all IOCs installed for this system
+
       list            - a list of all IOC instances under /epics/iocs:/opt/epics/iocs;
                         including those IOCs running on other hosts
 
@@ -117,7 +118,9 @@ Note: Conserver uses the tcpd for authentication.
 Try to pick something more creative than example1 ;)
 
 2) Create an IOC instance directory
+
     $sudo -s -u softioc
+
     $mkdir -p /epics/iocs/example1
 
     (option: Create a user 'example1': #useradd -c 'example1' -d /epics/iocs/example1 -g softioc -N example1
