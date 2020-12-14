@@ -88,7 +88,8 @@ status)
 nextport)
     # Find the highest port in use and add one.
     LAST="`visit reportone "$1" | tail -n '+2' | awk '{print $7}' | sort -n | tail -n1`"
-    [ -n "$LAST" -a "$LAST" -ne 0 ] && expr "$LAST" '+' 1 || echo 4050
+    #[ -n "$LAST" -a "$LAST" -ne 0 ] && expr "$LAST" '+' 1 || echo 4050
+    [ -z "$LAST" ] && echo 4050 || expr "$LAST" '+' 1
     ;;
 
 install)
