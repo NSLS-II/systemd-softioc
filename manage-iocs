@@ -33,7 +33,7 @@ shift $(($OPTIND - 1))
 
 cmd="$1"
 shift
-[ -n "$VERB" ] && echo "Searching in: $IOCBASE" && echo "Command: $cmd"
+[ -n "$VERB" ] && { echo "Searching in: $IOCPATH"; echo "Command: $cmd"; }
 
 
 case "$cmd" in
@@ -43,7 +43,8 @@ help)
 
 report)
     visit reportone "$@" 
-    
+
+    # installioc() also checks duplicated ports, so the following seems unnecessary    
     if [ $# -eq 0 ]; then
         # report duplicated ports
         #ports="`visit reportone "" | awk '{print $7}' ORS=' ' | sort -n`"

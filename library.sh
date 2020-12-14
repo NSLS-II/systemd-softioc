@@ -139,8 +139,8 @@ installioc() {
     CHDIR="$INSTBASE"
 
     if [ -f "$GLOBALBASE/config" ]; then
-	    cd "$GLOBALBASE"
-	    . "$GLOBALBASE/config"
+        cd "$GLOBALBASE"
+        . "$GLOBALBASE/config"
     fi
 
     # thsese variables must be explicitly set in $INSTCONF: NAME, PORT, HOST
@@ -171,8 +171,7 @@ die "Aborted: Wrong HOST('$HOST') set in '$INSTCONF'; it should be "$(hostname -
     # provide defaults for things not set by any config: USER, EXEC
     # default user name is softioc instance name
     USER="${USER:-${IOC}}"
-    id $USER &> /dev/null || \
-        die "Aborted: the user account '$USER' does not exist;\
+    id $USER &> /dev/null || die "Aborted: the user account '$USER' does not exist;\
  please set USER to an existing account (e.g. 'softioc') in "$INSTCONF""
 
     EXEC="${EXEC:-${CHDIR}/st.cmd}"
@@ -185,30 +184,29 @@ die "Aborted: Wrong HOST('$HOST') set in '$INSTCONF'; it should be "$(hostname -
     #export EPICS_HOST_ARCH=`/usr/lib/epics/startup/EpicsHostArch`
     export PROCPORT="$PORT"
 
-	# Needed so that the pid file can be written by $USER
-	# procServ will put in the correct pid
+    # Needed so that the pid file can be written by $USER/procServ
     PID=$PIDDIR/softioc-$IOC.pid
-	touch $PID || die "Failed to create pid file"
-	chown "$USER" $PID || die "Failed to chown pid file"
-	# Ensure PID is readable so 'manage-iocs status' works for anyone
-	# regardless of the active umask when an ioc is restarted.
-	chmod a+r $PID || die "Failed to chmod pid file"
+    touch $PID || die "Failed to create pid file $PID"
+    chown "$USER" $PID || die "Failed to chown pid file $PID"
+    # Ensure PID is readable so 'manage-iocs status' works for anyone
+    # regardless of the active umask when an ioc is restarted.
+    chmod a+r $PID || die "Failed to chmod pid file $PID"
 
-	# create log directory if necessary
+    # create log directory if necessary
     IOCLOGDIR=$LOGDIR/softioc/${IOC}
-	[ -d "$IOCLOGDIR" ] || install -d -m755 -o "$USER" "$IOCLOGDIR" \
-	|| echo "Warning: Failed to create directory: $IOCLOGDIR"
+    [ -d "$IOCLOGDIR" ] || install -d -m755 -o "$USER" "$IOCLOGDIR" \
+    || echo "Warning: Failed to create directory $IOCLOGDIR"
 
     # procServ arguments: --foreground, --quiet, --chdir, --ignore ...    
     PROCARGS="-f -q -c $CHDIR -i ^D^C^] -p $PID -n $IOC --restrict"
     # By default write logfile.  Set to 0 or '' to disable.
     LOG=1
     if [ -n "$LOG" -a "$LOG" != 0 ]; then
-	    PROCARGS="$PROCARGS -L $IOCLOGDIR/$IOC.log"
+        PROCARGS="$PROCARGS -L $IOCLOGDIR/$IOC.log"
     fi
 
     #if [ -n $CORESIZE ]; then
-	#    PROCARGS="$PROCARGS --coresize=$CORESIZE"
+    #    PROCARGS="$PROCARGS --coresize=$CORESIZE"
     #fi
 
     echo "Installing IOC $IOCBASE/$IOC ..."
