@@ -95,6 +95,8 @@ install)
     requireroot
     [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
     installioc "$1"
+    #enable IOC auto-start at boot
+    systemctl enable softioc-$1
     ;;
 
 uninstall)
