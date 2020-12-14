@@ -1,12 +1,12 @@
 NAME=your-IOC-name
-PORT=telnet-port-number
+PORT=procServ-port-number
 USER=softioc
 HOST=the-server-name-where-your-IOC-runs
 
 # Use "manage-iocs nextport" to get telnet-port-number;
 # Use "hostname" to get the-server-name-where-your-IOC-runs;
 # If you put a file "st.cmd" in /epics/iocs/$NAME, no need to set CHDIR and EXEC;
-# To log in the EPICS console/shell, type "telnet localhost telnet-port-number", 
+# To log in the EPICS console/shell, type "telnet localhost procServ-port-number", 
 ## then hit Enter and you will see "epics>"; to restart the softIOC, type "exit"
 ## or "Ctrl+X"; to quit the shell (return to your terminal), "Ctrl+]", 
 ## you will see "telnet>", then type "q"
@@ -17,15 +17,14 @@ HOST=the-server-name-where-your-IOC-runs
 #NAME=myioc
 #PORT=4050
 
-# USER: User name to run the IOC; use "softioc" which should have been created 
-# by "install.sh". 
+# USER: User name to run the IOC; use "softioc" which should have been created by "install.sh". 
 # Or use any existing username or manually create a username for each softioc instance.
 # if USER is not set, it is default to $NAME (softIoc name)
 #USER=softioc
 
 # HOST: name of the server on which this softIoc will run. This is used for error 
-# checking to prevent the instance from being run on the wrong server.
-# If not set then the check is disabled.
+# checking to prevent the instance from being run on the wrong server 
+# (for example, if "/epics/iocs" is an NFS mount shared by multiple servers)
 #HOST=myserver.domain.com
 
 # CHDIR: IOC run directory in which procServ will start the IOC. It is permissable
