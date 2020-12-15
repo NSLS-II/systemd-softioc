@@ -70,19 +70,17 @@ $manage-iocs help
 
 1) Choose a location for all softIoc instances / applications
 
-This will be a path which will contain a subdirectory for each softIoc instance.  A good choice would be '/epics/iocs' (or /opt/epics/iocs). Set this path in 'epics-softioc.conf':
+This will be a path which will contain a subdirectory for each softIoc instance. A good choice would be '/epics/iocs' (or '/opt/epics/iocs', or both). You can customize this path in '/usr/local/systemd-softioc/epics-softioc.conf' (not 'epics-softioc.conf' in your cloned repository). This is the default path:
 
     IOCPATH=/epics/iocs:/opt/epics/iocs
 
 2) Create a Unix user/group 'softioc'
 
-Altough each softIoc can run as a separate user/group, it is recommended using a single username 'softioc' (or all softIoc users be in the same group).  This provides a nice division and allows Channel Access security to distinguish all instances on a given machine. The script "install.sh" will try to create a username 'softioc'. If 'softioc' does not exist, you can create it:
+Altough each softIOC can run as a separate user/group, it is recommended using a single username 'softioc'. This provides a nice division and allows Channel Access security to distinguish all instances on a given machine. The script "install.sh" will try to create a username 'softioc'. If the user account 'softioc' does not exist, you can create it:
 
     #useradd softioc
 
-    (#groupadd softioc)
-
-3) Create a directory (/epics/iocs or /opt/epics/iocs is recommended) for softIoc instances
+3) Create a directory (/epics/iocs or /opt/epics/iocs is recommended) for softIOC instances
 
     #mkdir -p /epics/iocs
 
@@ -90,9 +88,9 @@ Altough each softIoc can run as a separate user/group, it is recommended using a
 
     #chmod g+ws /epics/iocs
 
-    Note: now you can switch to 'softioc': #sudo -s -u softioc, then do whatever you want in /epics/iocs.
+    Now, you can switch to 'softioc': #sudo -s -u softioc, then do whatever you want in /epics/iocs.
 
-Note: softioc:softioc is recommended. You can use other 'username:groupname', but you might get permission issues when using autosave in an IOC.
+Note: softioc:softioc is recommended. You can use other 'username:groupname', but you might get permission issues when 'autosave' is used in an IOC.
 
 4) Optional: Install Conserver
 
@@ -111,11 +109,10 @@ See the conserver documentation for information on access control.
 Note: Conserver uses the tcpd for authentication.
 
 
+
 == Per-Instance Setup ==
 
-0) Firstly, choose a name. Try to pick something more creative than example1. If you have not switched to 'softioc' yet, do this: 
-
-    #sudo -s -u softioc
+0) Firstly, choose a name. Try to pick something more creative than example1. If you have not switched to 'softioc' yet, do this: #sudo -s -u softioc
 
 1) Create an IOC instance directory
 
@@ -141,13 +138,13 @@ Each instance must have a unique name and a unique port number (for procServ).  
 
     USER=softioc
 
-NAME: required to match your IOC instance name
+NAME: required to match your IOC instance name.
 
-PORT: type 'manage-iocs nextport', which tries to pick an unused port number for procServ.
+PORT: type 'manage-iocs nextport', which tries to pick an unused port number for procServ. DO NOT use any well-known ports (23, 80, 5064, 5065, 8080, etc.).
 
 HOST: required to match the result of 'hostname -s' or 'hostname -f'.
 
-USER: an user account which must exist on localhost
+USER: a user account which must exist on localhost.
 
 CHDIR/EXEC: if you do not have a 'st.cmd' in /epics/iocs/example1, you have to set CHDIR and EXEC accordingly in the 'config'. See config.example for allowed items in a IOC config file.
 
@@ -157,7 +154,7 @@ After you are done with customizing the file 'config', it is a good practice to 
 
     #manage-iocs install example1
 
-    (#manage-iocs uninstall example1: this removes the unit file /etc/systemd/system/softioc-example.service)
+    (#manage-iocs uninstall example1: this removes the unit file)
 
 4) Start the IOC instance. You will be asked if you want auto-start IOC at boot. If yes, the IOC will automatically startup after the host server boots up.
 
@@ -165,7 +162,7 @@ After you are done with customizing the file 'config', it is a good practice to 
 
 It is a good practice to use 'manage-iocs status' to confirm your IOC's status. 
 
-5) Telnet to the IOC example1's EPICS shell to see if it is really working
+5) Telnet to the IOC's EPICS shell to see if it is really working.
 
     $telnet localhost procServ-port-number
 
