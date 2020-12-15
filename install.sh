@@ -24,7 +24,9 @@ echo "Source files are successfully copied to $INSTALLDIR. See below:"
 ls -lht $INSTALLDIR
 
 #install epics-softioc.logrotate
-cp epics-softioc.logrotate /etc/logrotate.d || die "Failed to setup logrotate"
+if [ -d /etc/logrotate.d ]; then
+    cp epics-softioc.logrotate /etc/logrotate.d || echo "Failed to setup logrotate"
+fi
 
 #'manage-iocs' is a symbolic link
 SYMLINK=/usr/bin/manage-iocs
@@ -42,8 +44,8 @@ printf "Successfully created the symlink: $SYMLINK -> $(readlink -f $SYMLINK)\n\
 
 #get, build and install procServ
 [ -f /usr/bin/procServ ] && read -p "procServ is already installed in /usr/bin. \
-Do you want to remove it and install a new one? Type 'yes' or 'no'. " answer
-[ ! $answer = 'yes' ] && die "Done."
+Do you want to remove it and install a new one? Type 'yes' if you do. " answer
+[ ! "$answer" = "yes" ] && die "Done."
 PROCSERVGIT="https://github.com/ralphlange/procServ.git"
 PROCSERVDIR=/tmp/procServ
 cd /tmp
