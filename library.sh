@@ -3,7 +3,7 @@
 usage() {
     printf "Usage: %s [-v] [-x] cmd\n" `basename $0`
     echo "Available commands:"
-    echo "  help            - display this message"
+    echo "  help            - Display this message"
     echo "  report [ioc]    - Show config(s) of an IOC/all IOCs on localhost"
     echo "  status          - Check if installed IOCs are running or stopped"
     echo "  nextport        - Find the next unused procServ port"
@@ -13,7 +13,9 @@ usage() {
     echo "  stop <ioc>      - Stop the IOC <ioc>"
     echo "  startall        - Start all IOCs installed for this system"
     echo "  stopall         - Stop all IOCs installed for this system"
-    echo "  list            - a list of all IOC instances under $IOCPATH;"
+    echo "  enable <ioc>    - Enable auto-start IOC <ioc> at boot"
+    echo "  disable <ioc>   - Disable auto-start IOC <ioc> at boot"
+    echo "  list            - A list of all IOC instances under $IOCPATH;"
     echo "                    including those IOCs running on other hosts"
     exit 2
 }

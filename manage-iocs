@@ -12,7 +12,11 @@ SRCDIR="$(dirname "$(readlink -f "$0")")"
 
 # variable configuration: IOCPATH, PIDDIR, LOGDIR, PROCSERV, SYSTEMDDIR
 CONF="$SRCDIR/epics-softioc.conf"
-[ -f "$CONF" ] && . "$CONF" || die "Aborted: missing $CONF"
+if [ -f "$CONF" ]; then
+    . "$CONF" 
+else
+    die "Aborted: missing $CONF"
+fi
 
 # function library: usage, vist, reportone, requireroot, installioc  
 LIBRARY="$SRCDIR/library.sh"
@@ -69,7 +73,18 @@ status)
         printf "$unitfile\t\t"
         #systemctl -q is-active $unitfile
         #if [ $? -eq 0 ]; then
-        [ $result = "active" ] && printf "Running\n" || printf "Stopped\n"
+        if [ $result = "active" ]; then
+            printf "Running"
+        elif [ $result = "inactive" ]; then
+            printf "Stopped"
+        else
+            printf "Strange status: $result"
+        fi
+        # status of auto-start at boot
+        if [ ! -f "$SYSTEMDDIR/multi-user.target.wants/$unitfile" ]; then
+            printf ".  Not registered"
+        fi
+        printf "\n"
 
         # consistency checking in case something changed on the IOC  
         IOC=${unitfile#softioc-}
@@ -89,6 +104,7 @@ nextport)
     # Find the highest port in use and add one.
     LAST="`visit reportone "$1" | tail -n '+2' | awk '{print $7}' | sort -n | tail -n1`"
     #[ -n "$LAST" -a "$LAST" -ne 0 ] && expr "$LAST" '+' 1 || echo 4050
+    # could "echo 4050" fail?
     [ -z "$LAST" ] && echo 4050 || expr "$LAST" '+' 1
     ;;
 
@@ -96,19 +112,27 @@ install)
     requireroot
     [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
     installioc "$1"
-    #enable IOC auto-start at boot
-    systemctl enable softioc-$1
+    # ask to start the IOC if it is not running? NO, otherwise infinite loop
     ;;
 
 uninstall)
     requireroot
     [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
+    systemctl -q is-active softioc-$1.service
+    [ $? -eq 0 ] && die "Aborted: the IOC '$1' is running. Please stop it first"
+
     unitfile=$SYSTEMDDIR/softioc-$1.service
     if [ -f $unitfile ]; then
         rm -f $SYSTEMDDIR/softioc-$1.service || die "Failed to remove $unitfile"
         echo "$unitfile is removed successfully"
     else
-        die "Aborted: $unitfile does not exist"
+        die "Aborted: $unitfile is already removed "
+    fi
+
+    # ask to disable auto-start IOC at boot if it is enabled
+    if [ -h $SYSTEMDDIR/multi-user.target.wants/softioc-$1.service ]; then
+        read -p "Do you want to disable auto-start '$1' at boot? Type 'yes' if you do. " answer
+        [ "$answer" = "yes" ] && manage-iocs disable $1
     fi
     ;;
 
@@ -116,8 +140,8 @@ start)
     requireroot
     [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
     systemctl -q is-active softioc-$1.service
-    [ $? -eq 0 ] && die "The IOC $1 is already running"
-    echo "Starting the IOC $1 ..."
+    [ $? -eq 0 ] && die "The IOC '$1' is already running"
+    echo "Starting the IOC '$1' ..."
     # update the unit file just in case the IOC's config file is changed
     manage-iocs install $1 2>&1 >/dev/null
     systemctl daemon-reload
@@ -125,9 +149,15 @@ start)
     sleep 1
     systemctl -q is-active softioc-$1.service
     if [ $? -eq 0 ]; then
-        echo "The IOC $1 has been started successfully"
+        echo "The IOC '$1' has been started successfully"
     else
-        die "Failed to start the IOC $1; type 'sudo journalctl -xe' for details."
+        die "Failed to start the IOC '$1'; type 'sudo journalctl -xe' for details."
+    fi
+
+    # ask to enable auto-start IOC at boot if it is not enabled
+    if [ ! -h $SYSTEMDDIR/multi-user.target.wants/softioc-$1.service ]; then
+        read -p "Do you want to enable auto-start '$1' at boot? Type 'yes' if you do. " answer
+        [ "$answer" = "yes" ] && manage-iocs enable $1
     fi
     ;;
 
@@ -167,6 +197,34 @@ stopall)
         IOC=${IOC%.service}
         manage-iocs stop $IOC
     done
+    ;;
+
+enable)
+    #enable IOC auto-start at boot
+    requireroot
+    [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
+    if [ -h $SYSTEMDDIR/multi-user.target.wants/softioc-$1.service ]; then
+        die "auto-start '$1' at boot is already enabled"
+    fi
+
+    systemctl enable softioc-$1 #&> /dev/null 
+    if [ -h $SYSTEMDDIR/multi-user.target.wants/softioc-$1.service ]; then
+        echo "auto-start the IOC '$1' at boot has been enabled successfully"
+    fi
+    ;;
+
+disable)
+    #disable IOC auto-start at boot
+    requireroot
+    [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
+    if [ ! -h $SYSTEMDDIR/multi-user.target.wants/softioc-$1.service ]; then
+        die "auto-start '$1' at boot is already disabled"
+    fi
+
+    systemctl disable softioc-$1 
+    if [ ! -h $SYSTEMDDIR/multi-user.target.wants/softioc-$1.service ]; then
+        echo "auto-start the IOC '$1' at boot has been disabled successfully"
+    fi
     ;;
 
 list)
