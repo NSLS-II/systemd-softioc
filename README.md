@@ -58,6 +58,10 @@ $manage-iocs help
 
       stopall         - Stop all IOCs installed for this system
 
+      enable <ioc>    - Enable auto-start IOC <ioc> at boot
+
+      disable <ioc>   - Disable auto-start IOC <ioc> at boot
+
       list            - a list of all IOC instances under /epics/iocs:/opt/epics/iocs;
                         including those IOCs running on other hosts
 
