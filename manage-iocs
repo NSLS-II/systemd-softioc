@@ -81,7 +81,7 @@ status)
             printf "Strange status: $result"
         fi
         # status of auto-start at boot
-        if [ ! -f "$SYSTEMDDIR/multi-user.target.wants/$unitfile" ]; then
+        if [ ! -h "$SYSTEMDDIR/multi-user.target.wants/$unitfile" ]; then
             printf ".  Not registered"
         fi
         printf "\n"
@@ -175,6 +175,14 @@ stop)
     else
         die "Failed to stop the IOC $1; type 'sudo journalctl -xe' for details."
     fi
+    ;;
+
+restart)
+    requireroot
+    [ -z "$1" ] && die "Aborted: missing one argument -- an IOC name"
+    systemctl -q is-active softioc-$1.service
+    [ $? -eq 0 ] && manage-iocs stop $1
+    manage-iocs start $1
     ;;
 
 startall)

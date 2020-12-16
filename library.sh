@@ -11,6 +11,7 @@ usage() {
     echo "  uninstall <ioc> - Remove /etc/systemd/system/softioc-[ioc].service"
     echo "  start <ioc>     - Start the IOC <ioc>"
     echo "  stop <ioc>      - Stop the IOC <ioc>"
+    echo "  restart <ioc>   - Restart the IOC <ioc>"
     echo "  startall        - Start all IOCs installed for this system"
     echo "  stopall         - Stop all IOCs installed for this system"
     echo "  enable <ioc>    - Enable auto-start IOC <ioc> at boot"
