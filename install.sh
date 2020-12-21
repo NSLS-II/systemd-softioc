@@ -46,12 +46,20 @@ printf "Successfully created the symlink: $SYMLINK -> $(readlink -f $SYMLINK)\n\
 [ -f /usr/bin/procServ ] && read -p "procServ is already installed in /usr/bin. \
 Do you want to remove it and install a new one? Type 'yes' if you do. " answer
 [ ! "$answer" = "yes" ] && die "Done."
+
+distID="$(cat /etc/os-release | grep "^ID=" | cut -d '=' -f2)"
+if [ "$distID" == "\"centos\"" ] || [ "$distID" == "debian" ]; then
+    read -p "There is a package for 'procServ'. You may manually install it. \
+Do you still want to build procServ from github? Type 'yes' if you do" answer
+    [ ! "$answer" = "yes" ] && die "Done."
+fi 
+
 PROCSERVGIT="https://github.com/ralphlange/procServ.git"
 PROCSERVDIR=/tmp/procServ
 cd /tmp
 [ -d $PROCSERVDIR ] && { rm -fR $PROCSERVDIR || die "Failed to remove $PROCSERVDIR"; }
 
-echo "Building procServ ..."
+echo "Building procServ from github..."
 git clone $PROCSERVGIT
 cd procServ
 
