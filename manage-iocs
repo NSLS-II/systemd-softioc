@@ -67,9 +67,16 @@ status)
     ls -1 $SYSTEMDDIR/softioc-*.service | while read ff
     do
         unitfile="`basename "$ff"`"
-        result="$(systemctl is-active $unitfile)"
+        # On Debian: Failed to retrieve unit: Access denied
+        systemctl is-active $unitfile &> /dev/null
+        if [ $? -ne 0 ]; then
+            result="unknown"
+        else
+            result="$(systemctl is-active $unitfile)"
+        fi
+        
         # one has to use 'sudo ...' on old CentOS (7.8)
-        [ $result = "unknown" ] && { echo "Type 'sudo manage-iocs status'"; continue; } 
+        [ $result = "unknown" ] &&  die "Please type 'sudo manage-iocs status'"  
         printf "$unitfile\t\t"
         #systemctl -q is-active $unitfile
         #if [ $? -eq 0 ]; then
