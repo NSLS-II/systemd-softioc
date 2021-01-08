@@ -68,24 +68,20 @@ status)
     do
         unitfile="`basename "$ff"`"
         # On Debian: Failed to retrieve unit: Access denied
-        systemctl is-active $unitfile &> /dev/null
-        if [ $? -ne 0 ]; then
-            result="unknown"
-        else
-            result="$(systemctl is-active $unitfile)"
-        fi
-        
+        result="$(systemctl is-active $unitfile)" &> /dev/null
         # one has to use 'sudo ...' on old CentOS (7.8)
-        [ $result = "unknown" ] &&  die "Please type 'sudo manage-iocs status'"  
+        if [ "$result" = "unknown" -o -z "$result" ]; then 
+            die "Please type 'sudo manage-iocs status'"  
+        fi
         printf "$unitfile\t\t"
         #systemctl -q is-active $unitfile
         #if [ $? -eq 0 ]; then
-        if [ $result = "active" ]; then
+        if [ "$result" = "active" ]; then
             printf "Running"
-        elif [ $result = "inactive" ]; then
+        elif [ "$result" = "inactive" ]; then
             printf "Stopped"
         else
-            printf "Strange status: $result"
+            printf "Strange status: $result. Please try 'sudo manage-iocs status'"
         fi
         # status of auto-start at boot
         if [ ! -h "$SYSTEMDDIR/multi-user.target.wants/$unitfile" ]; then
