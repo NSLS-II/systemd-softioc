@@ -104,7 +104,7 @@ reportone() {
     local BASE="`dirname $1`"
     local INSTBASE="$1"
     CHDIR="$1"
-    . "$1/config"
+    [ -f "$1/config" ] && . "$1/config"
     USER="${USER:-${IOC}}"
     EXEC="${EXEC:-${CHDIR}/st.cmd}"
 
