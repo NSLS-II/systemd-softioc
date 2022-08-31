@@ -1,5 +1,6 @@
 #!/bin/bash
 
+VER="1-10"
 PATH="${PATH}:/sbin:/bin:/usr/sbin:/usr/bin"
 
 function die {
@@ -240,6 +241,10 @@ disable)
 
 list)
     visit echo "$1"
+    ;;
+
+version)
+    echo "Version: $VER"
     ;;
 
 *)

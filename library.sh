@@ -18,6 +18,7 @@ usage() {
     echo "  disable <ioc>   - Disable auto-start IOC <ioc> at boot"
     echo "  list            - A list of all IOC instances under $IOCPATH;"
     echo "                    including those IOCs running on other hosts"
+    echo "  version         - version number"
     exit 2
 }
 
@@ -235,6 +236,10 @@ ConditionFileIsExecutable=$PROCSERV
 [Service]
 User=$USER
 ExecStart=$PROCSERV $PROCARGS $PORT $EXEC
+Environment="HOSTNAME=$HOSTNAME"
+Environment="IOCNAME=$IOCNAME"
+Environment="TOP=$TOP"
+Environment="PROCPORT=$PROCPORT"
 #Restart=on-failure
 
 [Install]

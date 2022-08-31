@@ -96,7 +96,7 @@ above, consistence of using user account is very important for file access permi
 After you are done with customizing the file `config`, it is a good practice to use `manage-iocs report` 
 to confirm your IOC's configuration. 
 
-### 3) install the softIOC
+### 3) Install the softIOC
 
     #manage-iocs install example1
 
@@ -116,15 +116,13 @@ Finally Telnet to the EPICS shell of the softIOC `example1` to see if it is real
     $telnet localhost 4051
 
 ## References
-The following sections are just for your reference.
+The following sections are just for your references.
 
 ### IOC runtime environment
 The following environment variables are automatically set before procServ is started so that you can
 use them in your `st.cmd`.
 
     IOCNAME - The softIOC name.
-
-    USER - The system user account name which runs the procServ/softIOC.
 
     HOSTNAME - The short name of the host running the softIOC.
 
