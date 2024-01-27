@@ -43,9 +43,12 @@ printf "Successfully created the symlink: $SYMLINK -> $(readlink -f $SYMLINK)\n\
 
 
 #get, build and install procServ
-[ -f /usr/bin/procServ ] && read -p "procServ is already installed in /usr/bin. \
+which procServ > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    read -p "procServ is already installed. \
 Do you want to remove it and install a new one? Type 'yes' if you do. " answer
-[ ! "$answer" = "yes" ] && die "Done."
+    [ ! "$answer" = "yes" ] && die "Done."
+fi
 
 distID="$(cat /etc/os-release | grep "^ID=" | cut -d '=' -f2)"
 if [ "$distID" == "\"centos\"" ] || [ "$distID" == "debian" ]; then
